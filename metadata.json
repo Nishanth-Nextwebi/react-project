@@ -1,0 +1,6 @@
+{
+  "name": "Insurance Tracking System",
+  "description": "A robust policy management, tracking, and automatic renewal system for small and medium insurance agencies, featuring client profiles, vehicle mapping, bulk WhatsApp alerts, and PDF/Excel generation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
