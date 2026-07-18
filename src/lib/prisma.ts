@@ -36,6 +36,20 @@ const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT
 // freeze/thaw window.
 const idleTimeout = process.env.VERCEL ? 30 : undefined;
 
+// The mariadb driver's own default connectTimeout (the per-attempt socket-
+// creation timeout, separate from the pool's 10s acquireTimeout) is just
+// 1000ms - too tight for Vercel's serverless network path to a remote
+// managed database. Diagnosed directly against this project's Aiven
+// instance: a raw mariadb.createConnection() with connectTimeout left at
+// 8000ms succeeded reliably from Vercel, while PrismaMariaDb left at the
+// 1000ms default intermittently failed a fresh connection attempt with
+// "Connection timeout: failed to create socket after 1001ms" - which the
+// pool then retries until its own 10s acquireTimeout expires, surfacing as
+// the generic "pool timeout ... active=0 idle=0" error. Raising this one
+// value directly fixes the failure at its source instead of working around
+// it with more pool retries.
+const connectTimeout = process.env.VERCEL ? 8000 : undefined;
+
 // Managed MySQL providers (e.g. Aiven) reject plaintext connections and
 // require TLS. DATABASE_URL carries this as a `ssl-mode`/`sslmode` query
 // param (Aiven's own connection strings include `?ssl-mode=REQUIRED`) -
@@ -66,6 +80,7 @@ const adapter = new PrismaMariaDb({
   database: databaseUrl.pathname.replace(/^\//, ""),
   connectionLimit,
   idleTimeout,
+  connectTimeout,
   ssl,
   // MySQL 8's default caching_sha2_password auth plugin needs the client to
   // fetch the server's RSA public key to encrypt the password, which is only
