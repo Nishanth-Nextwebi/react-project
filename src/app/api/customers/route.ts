@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { CustomerService } from "@/services/customerService";
 import { customerSchema } from "@/lib/validations";
+import { serializeCustomer } from "./_serialize";
+
+const customerService = new CustomerService();
 
 /**
  * GET /api/customers
@@ -26,7 +29,7 @@ export async function GET(req: NextRequest) {
     const sortOrder = (searchParams.get("sortOrder") || "desc") === "asc" ? "asc" : "desc";
     const includeInactive = searchParams.get("includeInactive") === "true";
 
-    const data = await CustomerService.listCustomers({
+    const data = await customerService.listCustomers({
       page,
       limit,
       search,
@@ -38,7 +41,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Customers retrieved successfully.",
-      data,
+      data: {
+        customers: data.customers.map(serializeCustomer),
+        pagination: data.pagination,
+      },
     });
   } catch (error: any) {
     console.error("GET /api/customers error:", error);
@@ -64,8 +70,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    
-    // Validate request body against Zod validation rules
+
     const validationResult = customerSchema.safeParse(body);
     if (!validationResult.success) {
       const errorDetails = validationResult.error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
@@ -79,23 +84,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const createdCustomer = await CustomerService.createCustomer(
-      validationResult.data,
-      session.user.id
-    );
+    const createdCustomer = await customerService.createCustomer(validationResult.data, session.user.id);
 
     return NextResponse.json(
       {
         success: true,
         message: "Customer created successfully.",
-        data: createdCustomer,
+        data: serializeCustomer(createdCustomer),
       },
       { status: 201 }
     );
   } catch (error: any) {
     console.error("POST /api/customers error:", error);
 
-    // Differentiate between uniqueness constraint errors and standard database anomalies
     const isConflict = error.message && error.message.includes("already active");
     return NextResponse.json(
       {

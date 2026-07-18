@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { dbConnect } from "@/lib/mongodb";
-import User from "@/models/User";
-import bcrypt from "bcryptjs";
-import { ActivityService } from "@/services/activityService";
-import mongoose from "mongoose";
+import { UserService } from "@/services/userService";
+
+const userService = new UserService();
+const OBJECT_ID_REGEX = /^[0-9a-fA-F]{24}$/;
 
 /**
  * PATCH /api/users/[id]
@@ -19,64 +18,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const { id } = await params;
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    if (!id || !OBJECT_ID_REGEX.test(id)) {
       return NextResponse.json({ success: false, message: "Invalid user ID." }, { status: 400 });
     }
 
     const body = await req.json();
-    const { name, email, role, isActive, password } = body;
+    const result = await userService.updateUser(id, body, session.user.id, session.user.name || undefined);
 
-    await dbConnect();
-    const userToUpdate = await User.findById(id);
-
-    if (!userToUpdate) {
-      return NextResponse.json({ success: false, message: "User not found." }, { status: 404 });
+    if (!result.success) {
+      return NextResponse.json({ success: false, message: result.message }, { status: result.status });
     }
-
-    // Guard against disabling or changing oneself if there is only one admin (optional, let's keep it simple but safe)
-    if (session.user.id === id && isActive === false) {
-      return NextResponse.json({ success: false, message: "Self-deactivation is prohibited." }, { status: 400 });
-    }
-
-    if (name) userToUpdate.name = name.trim();
-    if (email) {
-      const emailClean = email.trim().toLowerCase();
-      // Check for duplicate emails
-      const duplicate = await User.findOne({ email: emailClean, _id: { $ne: id } });
-      if (duplicate) {
-        return NextResponse.json({ success: false, message: "Email already in use by another profile." }, { status: 400 });
-      }
-      userToUpdate.email = emailClean;
-    }
-    if (role) userToUpdate.role = role;
-    if (isActive !== undefined) userToUpdate.isActive = isActive;
-
-    // Secure password reset if provided
-    if (password && password.trim().length > 0) {
-      const salt = await bcrypt.genSalt(10);
-      userToUpdate.password = await bcrypt.hash(password, salt);
-    }
-
-    await userToUpdate.save();
-
-    // Log the update action
-    await ActivityService.log(
-      session.user.id,
-      session.user.name || undefined,
-      "User Actions",
-      `Modified settings/privileges for user "${userToUpdate.name}" (Role: ${userToUpdate.role}, Active: ${userToUpdate.isActive})`
-    );
 
     return NextResponse.json({
       success: true,
       message: "User updated successfully.",
-      user: {
-        id: userToUpdate._id,
-        name: userToUpdate.name,
-        email: userToUpdate.email,
-        role: userToUpdate.role,
-        isActive: userToUpdate.isActive,
-      },
+      user: result.user,
     });
   } catch (error: any) {
     console.error("PATCH /api/users/[id] error:", error);
@@ -96,28 +52,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     }
 
     const { id } = await params;
-    if (!id || !mongoose.Types.ObjectId.isValid(id)) {
+    if (!id || !OBJECT_ID_REGEX.test(id)) {
       return NextResponse.json({ success: false, message: "Invalid user ID." }, { status: 400 });
     }
 
-    if (session.user.id === id) {
-      return NextResponse.json({ success: false, message: "Self-deletion of accounts is prohibited." }, { status: 400 });
+    const result = await userService.deleteUser(id, session.user.id, session.user.name || undefined);
+
+    if (!result.success) {
+      return NextResponse.json({ success: false, message: result.message }, { status: result.status });
     }
-
-    await dbConnect();
-    const deletedUser = await User.findByIdAndDelete(id);
-
-    if (!deletedUser) {
-      return NextResponse.json({ success: false, message: "User not found in registry." }, { status: 404 });
-    }
-
-    // Log user deactivation/removal
-    await ActivityService.log(
-      session.user.id,
-      session.user.name || undefined,
-      "User Actions",
-      `Removed user account for "${deletedUser.name}" (${deletedUser.email})`
-    );
 
     return NextResponse.json({
       success: true,

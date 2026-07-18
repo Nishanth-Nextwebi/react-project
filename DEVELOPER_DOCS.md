@@ -1,104 +1,99 @@
 # Insurance Tracking System - Developer Documentation
 
-This document serves as the live, synchronized technical reference for the Insurance Tracking System (PolicyFlow) built with Next.js 15, TypeScript, Tailwind CSS, shadcn/ui, NextAuth, and MongoDB.
+This document is the technical reference for the Insurance Tracking System (PolicyFlow), built with Next.js 16 (App Router), TypeScript, Tailwind CSS, shadcn/ui, NextAuth v4, and **Prisma ORM on MySQL** (Aiven MySQL in production).
 
 ---
 
 ## 1. Project Directory Structure
 
-Below is the directory mapping for **Module 1: Initialization & Authentication**:
-
 ```
 .
-├── .env                              # Active local runtime environment variables
+├── .env                              # Active local runtime environment variables (gitignored)
 ├── .env.example                      # Distribution template for env configuration
-├── DEVELOPER_DOCS.md                 # Synchronized system documentation (this file)
+├── CLAUDE.md                         # AI-agent-facing architecture/context reference
+├── DEVELOPER_DOCS.md                 # This file
 ├── next-env.d.ts                     # Next.js custom TypeScript declarations
 ├── next.config.js                    # Next.js framework configuration
 ├── package.json                      # Build script pipelines and packages
 ├── postcss.config.mjs                # PostCSS and Tailwind CSS processing definitions
+├── prisma.config.ts                  # Prisma 7 config file (datasource URL, migrations path)
+├── prisma/
+│   ├── schema.prisma                 # Single source of truth for the database schema
+│   └── migrations/                   # Committed, ordered migration history
 ├── tsconfig.json                     # TypeScript compiler strict constraints
 └── src
     ├── app
-    │   ├── api
-    │   │   ├── auth
-    │   │   │   └── [...nextauth]
-    │   │   │       └── route.ts      # NextAuth.js dynamic auth handler API route
-    │   │   └── setup
-    │   │       └── route.ts          # Development system initialization utility
-    │   ├── dashboard
-    │   │   ├── layout.tsx            # Protected dashboard shell & template with global state
-    │   │   └── page.tsx              # Diagnostic workspace and landing view for Module 1
-    │   ├── login
-    │   │   └── page.tsx              # Safe authentication form view (Zod, React Hook Form)
-    │   ├── layout.tsx                # Core HTML envelope and SessionProvider wrapper
-    │   └── page.tsx                  # Root redirect engine (auto routes to /dashboard or /login)
+    │   ├── api                       # Route handlers - see section 8
+    │   ├── dashboard                 # Authenticated pages (customers, vehicles, policies, ...)
+    │   ├── login/page.tsx             # Credentials/Google sign-in form
+    │   ├── layout.tsx                  # Core HTML envelope and SessionProvider wrapper
+    │   └── page.tsx                     # Root redirect engine (auto routes to /dashboard or /login)
     ├── components
-    │   ├── layout
-    │   │   ├── Header.tsx            # Shell top nav with live profile & signout features
-    │   │   └── Sidebar.tsx           # Role-based workspace menu links
-    │   └── providers
-    │       └── SessionProvider.tsx   # React context wrapper for authentication state
+    │   ├── layout/                   # Header.tsx, Sidebar.tsx
+    │   └── providers/SessionProvider.tsx
+    ├── generated/prisma/              # Prisma client output (generated, gitignored)
     ├── lib
-    │   ├── auth.ts                   # Core NextAuth config with JWT & Iframe support
-    │   ├── mongodb.ts                # Mongoose connection layer with static caching
-    │   └── utils.ts                  # Utility helper functions
-    ├── models
-    │   └── User.ts                   # Mongoose Schema mapping the PolicyFlow user profiles
-    ├── types
+    │   ├── auth.ts                   # NextAuth config (Credentials + Google)
+    │   ├── database.ts               # db client re-export + transaction() helper
+    │   ├── env.ts                    # Fail-fast required-env-var validation
+    │   ├── objectId.ts               # generateObjectId() - mints row ids
+    │   ├── prisma.ts                 # PrismaClient construction (driver adapter, Aiven TLS)
+    │   ├── utils.ts                  # Misc frontend utilities
+    │   └── validations.ts            # Zod schemas: customer/vehicle/policy
+    ├── repositories/                 # Data-access classes, one per entity
+    ├── services/                     # Business-logic classes, one per entity
+    ├── types/
     │   └── next-auth.d.ts            # Type expansions for Auth roles and user tokens
-    └── index.css                     # Global styles, Tailwind imports, and layout custom rules
+    └── index.css
 ```
 
 ---
 
-## 2. Environment Variables (`.env.example`)
+## 2. Environment Variables
 
-The following variables dictate system connectivity. Ensure they are configured before booting:
+See `.env.example` for the full template. Key variables:
 
-```env
-# MongoDB Database Connection
-MONGODB_URI="mongodb+srv://sudarshankmwebdeveloper_db_user:2NEFbcyPIMOmj9uF@cluster0.uq1tsge.mongodb.net/policyflow?retryWrites=true&w=majority&appName=Cluster0"
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | Yes | MySQL connection string. Aiven requires `?ssl-mode=REQUIRED`. |
+| `NEXTAUTH_SECRET` | Yes | Signs session JWTs. App fails to start without it (`src/lib/env.ts`) - no hardcoded fallback. |
+| `NEXTAUTH_URL` | Recommended | Canonical deployment URL. |
+| `DATABASE_CA_CERT` | Optional | Aiven CA cert PEM contents, for strict TLS verification. |
+| `DATABASE_CONNECTION_LIMIT` | Optional | MySQL pool size (mariadb driver default 10). |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Optional | Google OAuth; falls back to non-functional dummy values if unset, so the provider is always registered. |
+| `WHATSAPP_TOKEN` / `WHATSAPP_PHONE_NUMBER_ID` | Optional | Unused - the reminders endpoint is a simulation. |
+| `CRON_SECRET` | Optional | Placeholder, not read by any current route. |
 
-# NextAuth Authentication Config
-NEXTAUTH_SECRET="f69df919b4e339dae75c61eb63d91653bc07ea8fa538bd8c6a0c5de2cfa8a93b" # Secure 32-byte secret
-NEXTAUTH_URL="http://localhost:3000"
-
-# Google OAuth Credentials (Optional - Placeholder during Module 1)
-GOOGLE_CLIENT_ID="google-oauth-placeholder"
-GOOGLE_CLIENT_SECRET="google-oauth-placeholder-secret"
-
-# WhatsApp Cloud API Configuration (Optional - Placeholder during Module 1)
-WHATSAPP_TOKEN="whatsapp-cloud-api-token-placeholder"
-WHATSAPP_PHONE_NUMBER="whatsapp-phone-number-placeholder"
-
-# Scheduled Cron Security (Optional - Placeholder during Module 1)
-CRON_SECRET="cron-endpoint-secret-placeholder"
-```
+No `MONGODB_URI`, `GEMINI_API_KEY`, or `APP_URL` are used anywhere in this codebase - remove them if you find them in an old `.env`.
 
 ---
 
-## 3. MongoDB Connection Flow
+## 3. Database Connection (Prisma / MySQL)
 
-PolicyFlow leverages **MongoDB Atlas** as the durable persistence layer combined with **Mongoose** as the ODM.
+PolicyFlow uses **Prisma 7** with the `@prisma/adapter-mariadb` driver adapter against **MySQL** (Aiven MySQL in production). This adapter connects directly over the `mariadb` npm driver rather than through Prisma's classic Rust query engine binary, which avoids the binary-platform-matching issues that Prisma-on-serverless deployments often hit.
 
-### Cached Database Connection (`src/lib/mongodb.ts`)
-To prevent connection leaks under hot reloading in development and to optimize cold start response times on serverless environments, we implement a static global cache for the connection promise:
+### Client construction (`src/lib/prisma.ts`)
+1. `DATABASE_URL` is parsed into host/port/user/password/database.
+2. If the URL's `ssl-mode`/`sslmode` query param requests TLS (Aiven always does), the adapter is configured with `ssl: true` (or a CA-verified config if `DATABASE_CA_CERT` is set).
+3. `allowPublicKeyRetrieval` is enabled only when TLS is **off** - required for MySQL 8's `caching_sha2_password` auth plugin over a plaintext local connection; irrelevant (and left off) against Aiven, which is always TLS.
+4. The client is cached on the Node `global` object so dev-mode hot reloads don't spawn a new client per reload.
 
-1. **Check Cache**: If `mongoose.conn` is already active in the global memory space, the handler returns immediately.
-2. **First Connection**: If no connection is cached, a new `mongoose.connect()` request is sent to the connection string found in `process.env.MONGODB_URI`.
-3. **Register Promise**: The ongoing connection promise is registered in the global cache. Upon resolution, future database requests pull from this single instance.
+### Access pattern (`src/lib/database.ts`)
+Repositories import the shared client as `db` from `@/lib/database`, never directly from `@/lib/prisma`. This file also exports `transaction()`, a thin wrapper around `db.$transaction()` used by `SmartSaveService` to make its combined Customer+Vehicle+Policy write atomic.
+
+### Primary keys
+Every table's `id` has no `@default()` in the schema. IDs are minted application-side by `generateObjectId()` (`src/lib/objectId.ts`, backed by the `bson` package), producing the same 24-character hex string shape as a MongoDB ObjectId. This is deliberate: the frontend's Zod validators (`/^[0-9a-fA-F]{24}$/` in `src/lib/validations.ts`) and every existing form/component were built against that id shape, so keeping it avoids touching frontend code or validation rules during the database migration.
 
 ---
 
 ## 4. Authentication Flow & NextAuth Configuration
 
-PolicyFlow implements strict authorization leveraging **NextAuth v4**.
+PolicyFlow implements authorization via **NextAuth v4**, with two providers: `CredentialsProvider` (email/password, bcrypt-hashed) and `GoogleProvider` (OAuth).
 
 ```
 [ Client Login Page ] ---> Submits Credentials ---> [ CredentialsProvider: authorize() ]
                                                                  │
-                                                   Finds User in Mongoose DB
+                                                   UserRepository.findByEmail()
                                                                  │
                                                    Verifies hash using bcryptjs
                                                                  │
@@ -109,221 +104,107 @@ PolicyFlow implements strict authorization leveraging **NextAuth v4**.
                                                                  │
                                                    [ session() Callback Triggered ]
                                                     Maps JWT -> Client Session
+
+[ Client ] ---> Google OAuth ---> [ signIn() callback ]
+                                        │
+                        UserRepository.findByEmail() by Google profile email
+                                        │
+                    Not found: create as "employee", isActive true, store googleId
+                    Found + inactive: reject sign-in (return false)
+                    Found + no googleId yet: backfill it
 ```
 
 ### NextAuth Configuration (`src/lib/auth.ts`)
-- **Providers**: Supports `CredentialsProvider` for Email/Password logins and `GoogleProvider` for secure single sign-on.
-- **Session Strategy**: Configured with `jwt` (JSON Web Tokens) with a maximum lifespan of 30 days.
-- **Callbacks**:
-  - `signIn`: Custom validations check if accounts are active.
-  - `jwt`: Transfers Custom Database fields (`role`, `id`) to the token payload. Supports reactive token updates.
-  - `session`: Exposes user metadata safely to client views.
-- **Iframe Compatibility**: Since PolicyFlow is previewed in a sandboxed iframe, we set specialized cookie constraints to prevent blockages:
-  ```ts
-  cookies: {
-    sessionToken: {
-      name: `next-auth.session-token`,
-      options: {
-        httpOnly: true,
-        sameSite: "none",
-        path: "/",
-        secure: true,
-      },
-    },
-  }
-  ```
+- **Providers**: `CredentialsProvider` and `GoogleProvider` (the latter always registered, using dummy placeholder credentials if `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` are unset - so Google sign-in silently fails rather than the app refusing to start).
+- **Session Strategy**: `jwt`, 30-day `maxAge`.
+- **Callbacks**: `signIn` (Google auto-provisioning, inactive-account rejection), `jwt` (copies `id`/`role` onto the token, supports `trigger: "update"`), `session` (copies them back onto `session.user`).
+- **Secret**: `NEXTAUTH_SECRET` only - no hardcoded fallback. `src/lib/env.ts` fails the app at startup if it's missing, so a silent insecure fallback is never reachable.
+- **Iframe Compatibility**: cookies are set with `sameSite: "none", secure: true` unconditionally, to keep auth working when the app is previewed inside a sandboxed iframe. This requires HTTPS in any real deployment - `secure` cookies are silently dropped over plain HTTP.
 
 ---
 
 ## 5. Routing Protection & Navigation Layout
 
-### Next.js 15 Layout Boundaries
-Rather than standard custom middleware, route access control is enforced at the server component layout level inside `src/app/dashboard/layout.tsx` and the main redirect root `src/app/page.tsx`:
+There is no Next.js middleware. Route access control is enforced at the server-component layer:
 
-1. **Initial Access**: When a client requests `/`, the root page `src/app/page.tsx` checks if a valid NextAuth session is active. If true, it redirects to `/dashboard`. If false, it redirects to `/login`.
-2. **Dashboard Boundary**: Inside `/dashboard/*`, the layout `src/app/dashboard/layout.tsx` checks the session at server execution. If the user session is missing, it triggers an instant redirect to `/login`.
-3. **Role-based Sidebar Links**: Inside `Sidebar.tsx`, the menu list adapts dynamically based on `session.user.role`. Administrative screens like **User Management** are completely hidden from standard employees.
-
----
-
-## 6. Secure System Initialization Endpoint (`/api/setup`)
-
-PolicyFlow features a development-only seeding utility located in `/api/setup`.
-
-- **Access Level**: Development Only.
-- **Production Guard**: Checks if `process.env.NODE_ENV === "production"`. If so, it instantly aborts with a `403 Forbidden` status to lock out malicious actors.
-- **Seeding Logic**:
-  - Connects to MongoDB Atlas and checks if any user with the `admin` role exists.
-  - If yes, aborts initialization without creating new entries.
-  - If no admin exists, creates a single default system administrator account:
-    - **Email**: `admin@insurance.com`
-    - **Password**: `Admin123!`
-    - **Role**: `admin`
-  - **Note**: No employee accounts are pre-seeded; employees must be manually created from the User Management admin page once logged in.
+1. **`src/app/page.tsx`** - checks session, redirects to `/dashboard` or `/login`.
+2. **`src/app/dashboard/layout.tsx`** - server component; redirects to `/login` if there's no session. Every page under `/dashboard/*` inherits this guard.
+3. **Per-route API auth** - every `route.ts` handler calls `getServerSession(authOptions)` itself and returns `401` if there's no session; admin-only routes (`/api/users*`) additionally check `session.user.role !== "admin"` and return `403`.
+4. **Role-based Sidebar Links** - `Sidebar.tsx` conditionally renders admin-only nav items (Users, Settings) based on `session.user.role === "admin"`.
 
 ---
 
-## 7. Production Deployment & Build Verification
+## 6. Layering Pattern: Repository → Service → Route
 
-To verify full system compatibility prior to deployment, execute:
+Every feature module follows the same three layers:
+
+1. **Repository** (`src/repositories/*.ts`) - thin Prisma query classes, no business logic. Constructor accepts an optional `Database` client (defaults to the shared singleton), which is how `SmartSaveService` runs repositories against a transaction client instead of the global one.
+2. **Service** (`src/services/*.ts`) - business rules: uniqueness checks against active records, cross-entity existence checks, soft-delete guards, Prisma error-code translation (`P2025` → not found, `P2003` → foreign-key conflict).
+3. **Route** (`src/app/api/**/route.ts`) - thin handler: session/role check → Zod validation → delegate to service → wrap in the response envelope → `_serialize.ts` maps Prisma's `id` to the `_id` key the frontend expects (matching the original database driver's default JSON serialization, so the frontend needed no changes).
+
+### Standard response envelope
+```json
+// success
+{ "success": true, "message": "...", "data": {} }
+// failure
+{ "success": false, "message": "...", "errors": ["..."] }
+```
+A few routes (`users`, `activities`, `dashboard`, `reminders/whatsapp`, `setup`) use a narrower shape without the `data`/`errors` wrapper - this is original, intentional API behavior, preserved exactly.
+
+---
+
+## 7. Secure System Initialization Endpoint (`/api/setup`)
+
+- **Access Level**: Development only. Returns `403` when `NODE_ENV === "production"`.
+- **Seeding Logic**: checks if any `admin`-role user exists; if not, creates one:
+  - **Email**: `admin@insurance.com`
+  - **Password**: `Admin123!`
+  - **Role**: `admin`
+- No employee accounts are pre-seeded - create them from the Users admin page once logged in.
+
+---
+
+## 8. API Route Reference
+
+All routes require a session (`401` if missing) unless noted. `/api/users*` requires `role === "admin"` (`403` otherwise).
+
+| Route | Methods | Notes |
+|---|---|---|
+| `/api/customers`, `/api/customers/[id]` | GET, POST, PUT, DELETE | Soft delete blocked if active vehicles exist. Phone uniqueness enforced among active customers only. |
+| `/api/vehicles`, `/api/vehicles/[id]` | GET, POST, PUT, DELETE | Soft delete blocked if active policies exist. `vehicleNumber`/`engineNumber`/`chassisNumber` unique globally at the DB level. |
+| `/api/policies`, `/api/policies/[id]` | GET, POST, PUT, DELETE | `policyNumber` unique globally. Customer/vehicle existence checked without an `isActive` filter (matches original behavior). |
+| `/api/policies/smart-save` | POST | Find-or-create Customer by phone, find-or-create Vehicle by number/chassis, always create a new Policy. Runs inside a single Prisma transaction. |
+| `/api/users`, `/api/users/[id]` | GET, POST, PATCH, DELETE | Admin only. Self-deactivation/self-deletion blocked. Hard delete; blocked with a clean message if the user still has authored records (MySQL FK constraint - MongoDB had no equivalent). |
+| `/api/activities` | GET, POST | Recent audit log entries, newest first. |
+| `/api/dashboard` | GET | Stats/charts/tables computed server-side; see `DashboardService`. |
+| `/api/reminders/whatsapp` | POST | **Simulation only** - builds message text and marks Sent/Failed, never calls a real WhatsApp API. |
+| `/api/setup` | GET | Dev-only bootstrap, see section 7. |
+| `/api/health` | GET | Unauthenticated DB-connectivity liveness check. |
+| `/api/auth/[...nextauth]` | GET, POST | NextAuth handler. |
+
+### Database schema (`prisma/schema.prisma`)
+
+- **User**: `name`, `email` (unique), `password` (nullable - OAuth-only accounts have none), `role` (`admin`|`employee`), `isActive`, `googleId`.
+- **Customer**: `name`, `phone` (NOT unique at the DB level - active-only uniqueness enforced in `customerService.ts`), `email`, `address`, `isActive`, `createdBy`/`updatedBy`.
+- **Vehicle**: `customer` ref, `vehicleNumber`/`engineNumber`/`chassisNumber` (all globally unique), `vehicleType` enum, `manufacturer`, `model`, `year`, `color`, `isActive`, `createdBy`/`updatedBy`.
+- **Policy**: `customer` + `vehicle` refs (denormalized - both stored directly), `policyNumber` (globally unique), `insuranceCompany`, `policyType`, `premiumAmount`, `startDate`, `expiryDate`, `extraField1-3`, `comments`, `attachmentUrl`, `isActive`, `createdBy`/`updatedBy`.
+- **ActivityLog**: `user` ref (nullable), `userName`, `action`, `details`, `ipAddress` (carried over from the original schema, unused by any current code path), `createdAt` only (write-once, never updated or soft-deleted).
+
+---
+
+## 9. Frontend Modules
+
+Every module under `src/app/dashboard/*/page.tsx` follows the same pattern: paginated list with search/sort/filter, a slide-over drawer for add/edit forms with Zod-mirrored client-side validation, and a details panel with related-entity lookups fetched separately (e.g. a customer's vehicles via `GET /api/vehicles?customerId=...`). Modules: Customers, Vehicles, Policies, Users (admin only), Reports, Settings, plus the Dashboard home page and the global Activity feed.
+
+---
+
+## 10. Production Deployment & Build Verification
 
 ```bash
-# Clean previous builds
-npm run clean
-
-# Run strict build
-npm run build
-
-# Start the Node.js runner
-npm run start
+npm install                 # runs "postinstall": "prisma generate" automatically
+npx prisma migrate deploy   # apply committed migrations, non-interactive - run separately from the build, not baked into it
+npm run build                # next build
+npm run start                 # next start
 ```
 
----
-
-## 8. Module 2: Customer & Vehicle Management (APIs)
-
-This module implements the complete backend architecture for customer accounts and vehicle registrations.
-
-### 8.1 API Standards & Unified Payload Formats
-Every API endpoint strictly implements standardized response structures and appropriate HTTP response codes:
-
-*   **Success Response (HTTP 200/201)**:
-    ```json
-    {
-      "success": true,
-      "message": "Action completed successfully.",
-      "data": {}
-    }
-    ```
-*   **Error Response (HTTP 400/401/403/404/409/500)**:
-    ```json
-    {
-      "success": false,
-      "message": "Specific error description.",
-      "errors": ["Detailed reason or field validation message"]
-    }
-    ```
-
-### 8.2 Database Schema Architecture
-
-#### **Customer Collection (`src/models/Customer.ts`)**
-*   `name`: String, required.
-*   `phone`: String, required. Case-insensitive index, primary communication field for WhatsApp.
-*   `email`: String, optional.
-*   `address`: String, optional.
-*   `isActive`: Boolean, default `true`. Allows soft deactivation.
-*   `createdBy` / `updatedBy`: References to `User` model (Audit tracking).
-
-#### **Vehicle Collection (`src/models/Vehicle.ts`)**
-*   `customer`: Reference to `Customer` model, required.
-*   `vehicleNumber`: String, required, unique, uppercase index.
-*   `vehicleType`: Enum (`"Two-Wheeler"`, `"Four-Wheeler"`, `"Commercial"`, `"Other"`), required.
-*   `manufacturer`: String, required.
-*   `model`: String, required.
-*   `year`: Number, required (from 1900 to current year + 1).
-*   `engineNumber`: String, required, unique, uppercase index.
-*   `chassisNumber`: String, required, unique, uppercase index.
-*   `color`: String, optional.
-*   `isActive`: Boolean, default `true`.
-*   `createdBy` / `updatedBy`: References to `User` model (Audit tracking).
-
----
-
-### 8.3 Route Specification & Core Endpoints
-
-#### **Customer APIs**
-
-##### **1. List Customers with Pagination, Sorting & Filtering**
-*   **Path**: `GET /api/customers`
-*   **URL Parameters**:
-    *   `page`: Page number (default: `1`)
-    *   `limit`: Page limit (default: `10`, max: `100`)
-    *   `search`: Search string matching `name`, `phone`, or `address` (case-insensitive)
-    *   `sortBy`: Sort field (default: `createdAt`)
-    *   `sortOrder`: Sort direction (`asc` or `desc`)
-    *   `includeInactive`: Fetch deactivated accounts (`true` or `false`)
-
-##### **2. Create Customer**
-*   **Path**: `POST /api/customers`
-*   **Payload (JSON)**:
-    ```json
-    {
-      "name": "Jane Doe",
-      "phone": "+1234567890",
-      "email": "jane@example.com",
-      "address": "123 Main St"
-    }
-    ```
-*   **Response Codes**:
-    *   `201 Created`: Customer successfully saved.
-    *   `400 Bad Request`: Zod validation failure.
-    *   `409 Conflict`: Active customer with duplicate phone number exists.
-
-##### **3. Get/Update/Deactivate Single Customer**
-*   **Path**: `GET /api/customers/[id]`
-    *   Retrieves customer details.
-*   **Path**: `PUT /api/customers/[id]`
-    *   Updates customer fields (Zod validated).
-*   **Path**: `DELETE /api/customers/[id]`
-    *   Performs **Soft Delete** (`isActive` set to `false`).
-    *   **Rigid Rule**: Will reject with `400 Bad Request` if there are any active vehicles linked to the customer.
-
----
-
-#### **Vehicle APIs**
-
-##### **1. List Vehicles**
-*   **Path**: `GET /api/vehicles`
-*   **URL Parameters**: Same pagination criteria as Customers. Supports filtering by customer: `customerId=CUSTOMER_ID`.
-
-##### **2. Create Vehicle**
-*   **Path**: `POST /api/vehicles`
-*   **Payload (JSON)**:
-    ```json
-    {
-      "customer": "65b987cdef65b987cdef0123",
-      "vehicleNumber": "KA-03-HA-1234",
-      "vehicleType": "Four-Wheeler",
-      "manufacturer": "Toyota",
-      "model": "Innova",
-      "year": 2024,
-      "engineNumber": "ENG12345678",
-      "chassisNumber": "CHA12345678"
-    }
-    ```
-*   **Validation Rules**:
-    *   Ensures target Customer exists and is active.
-    *   Ensures `vehicleNumber`, `engineNumber`, and `chassisNumber` are unique across active records.
-
-##### **3. Get/Update/Deactivate Single Vehicle**
-*   **Path**: `GET /api/vehicles/[id]`
-*   **Path**: `PUT /api/vehicles/[id]`
-*   **Path**: `DELETE /api/vehicles/[id]`
-    *   Performs **Soft Delete** (`isActive` set to `false`).
-    *   **Rigid Rule**: Will reject with `400 Bad Request` if any active policy references this vehicle.
-
----
-
-## 9. Module 2 - Frontend Implementation Status
-
-The entire Customer & Vehicle frontend module is fully completed and integrated. Both directories feature real-time database synchronizations, schema-validated inputs, multi-state visual indicators, and rigid soft delete confirmation flows.
-
-### 9.1 Customer Module Core Infrastructure
-*   **Path**: `/src/app/dashboard/customers/page.tsx`
-*   **Listing & Search**: Features a fully responsive paginated grid with interactive column sorting, status filters, and global multi-field search triggers.
-*   **Add Customer Drawer**: A slide-over right-side panel with immediate client validation (Name length constraints, 10-15 digit phone regex matches, and optional email structure validations). Submits a `POST` request to `/api/customers`.
-*   **Edit Customer Drawer**: Prepopulates customer data, allowing updates and account reactivation toggles via `PUT /api/customers/[id]`.
-*   **Customer Details Panel**: A split-frame profile card showing immediate contact coordinates, registered asset counters (statistics card), and a real-time timeline auditing creation metadata.
-*   **Sub-Asset Real-time Visualizer**: Inside the details panel, the client automatically sends a `GET /api/vehicles?customerId=X` request and populates a dynamic visual inventory list of all registered vehicles owned by this customer, including type and registration badges.
-
-### 9.2 Vehicle Module Core Infrastructure
-*   **Path**: `/src/app/dashboard/vehicles/page.tsx`
-*   **Listing & Search**: Includes visual cards and records. Columns list Registration plate badges, classification type, manufacturer/model specs, allocation owner profiles, and engine/chassis identifier numbers. Search matches across plate numbers, models, engine, or chassis IDs.
-*   **Advanced Customer Selector**: During registration, a client side `useEffect` fetches all active customers from `/api/customers?includeInactive=false` and populates an ownership selector, ensuring complete entity relational consistency.
-*   **Add Vehicle Drawer**: A slide-over panel utilizing rigorous validations for plate lengths (3-15 chars), classification types ("Two-Wheeler", "Four-Wheeler", "Commercial", "Other"), model/manufacturer length boundaries, year ranges (1900 to currentYear + 1), and unique chassis/engine fields. Submits a `POST` request to `/api/vehicles`.
-*   **Edit Vehicle Drawer**: Prepopulates parameters and exposes state toggling for system suspension/reactivation. Submits a `PUT` request to `/api/vehicles/[id]`.
-*   **Vehicle Details Spec Panel**: Displays full physical specifications, vehicle classifications, engine and chassis IDs, registration creation timestamps, and live owner credentials card (name, phone, email).
-*   **Deactivation Shield Confirmation Modal**: Implements structural alerts warning staff that deactivation will be rejected if the asset is currently referenced by any active insurance policy. Calls `DELETE /api/vehicles/[id]`.
-
-
-
+`npm run clean` removes `.next`/`dist`. There is no test suite configured in this repo. See `CLAUDE.md` for the full production-deployment checklist (Vercel + Aiven specifics, TLS configuration, connection pooling guidance).

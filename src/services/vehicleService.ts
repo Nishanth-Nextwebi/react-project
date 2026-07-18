@@ -1,8 +1,8 @@
-import mongoose from "mongoose";
-import { dbConnect } from "@/lib/mongodb";
-import Vehicle from "@/models/Vehicle";
-import Customer from "@/models/Customer";
-import Policy from "@/models/Policy";
+import { VehicleRepository } from "@/repositories/VehicleRepository";
+import { CustomerRepository } from "@/repositories/CustomerRepository";
+import { PolicyRepository } from "@/repositories/PolicyRepository";
+import type { VehicleInput } from "@/lib/validations";
+import type { Prisma } from "@/generated/prisma/client";
 
 export interface VehiclePaginationParams {
   page: number;
@@ -11,54 +11,54 @@ export interface VehiclePaginationParams {
   sortBy: string;
   sortOrder: "asc" | "desc";
   includeInactive?: boolean;
-  customerId?: string; // Optional filtering by customer
+  customerId?: string;
 }
 
 export class VehicleService {
+  private readonly repository: VehicleRepository;
+  private readonly customerRepository: CustomerRepository;
+  private readonly policyRepository: PolicyRepository;
+
+  constructor(
+    repository: VehicleRepository = new VehicleRepository(),
+    customerRepository: CustomerRepository = new CustomerRepository(),
+    policyRepository: PolicyRepository = new PolicyRepository()
+  ) {
+    this.repository = repository;
+    this.customerRepository = customerRepository;
+    this.policyRepository = policyRepository;
+  }
+
   /**
    * Fetch paginated, sorted, and filtered vehicles
    */
-  static async listVehicles(params: VehiclePaginationParams) {
-    await dbConnect();
-
+  async listVehicles(params: VehiclePaginationParams) {
     const { page, limit, search, sortBy, sortOrder, includeInactive = false, customerId } = params;
     const skip = (page - 1) * limit;
 
-    // Build query conditions
-    const query: any = {};
+    const where: Prisma.VehicleWhereInput = {};
     if (!includeInactive) {
-      query.isActive = true;
+      where.isActive = true;
     }
 
-    if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
-      query.customer = new mongoose.Types.ObjectId(customerId);
+    if (customerId) {
+      where.customerId = customerId;
     }
 
     if (search) {
       // Case-insensitive search on Vehicle Number, Engine Number, Chassis Number, Manufacturer, and Model
-      const searchRegex = new RegExp(search, "i");
-      query.$or = [
-        { vehicleNumber: searchRegex },
-        { engineNumber: searchRegex },
-        { chassisNumber: searchRegex },
-        { manufacturer: searchRegex },
-        { model: searchRegex },
+      where.OR = [
+        { vehicleNumber: { contains: search } },
+        { engineNumber: { contains: search } },
+        { chassisNumber: { contains: search } },
+        { manufacturer: { contains: search } },
+        { model: { contains: search } },
       ];
     }
 
-    const sortOptions: any = {};
-    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+    const orderBy: Prisma.VehicleOrderByWithRelationInput = { [sortBy]: sortOrder };
 
-    const [vehicles, total] = await Promise.all([
-      Vehicle.find(query)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limit)
-        .populate("customer", "name phone email")
-        .populate("createdBy", "name email")
-        .populate("updatedBy", "name email"),
-      Vehicle.countDocuments(query),
-    ]);
+    const { vehicles, total } = await this.repository.findMany({ skip, take: limit, where, orderBy });
 
     return {
       vehicles,
@@ -74,176 +74,128 @@ export class VehicleService {
   /**
    * Find a single vehicle by ID
    */
-  static async getVehicleById(id: string) {
-    await dbConnect();
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return null;
-    }
-    return await Vehicle.findById(id)
-      .populate("customer", "name phone email")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+  async getVehicleById(id: string) {
+    return this.repository.findById(id);
   }
 
   /**
    * Create a new Vehicle record
    */
-  static async createVehicle(data: any, userId: string) {
-    await dbConnect();
-
+  async createVehicle(data: VehicleInput, userId: string) {
     // 1. Verify that the associated Customer exists and is active
-    const customerExists = await Customer.findOne({
-      _id: new mongoose.Types.ObjectId(data.customer),
-      isActive: true,
-    });
-    if (!customerExists) {
+    const customer = await this.customerRepository.findById(data.customer);
+    if (!customer || !customer.isActive) {
       throw new Error("Associated customer not found or is currently inactive.");
     }
 
     // 2. Enforce uniqueness checks on Vehicle Number, Engine Number, and Chassis Number
-    const existingVehicleNumber = await Vehicle.findOne({
-      vehicleNumber: data.vehicleNumber.trim().toUpperCase(),
-      isActive: true,
-    });
-    if (existingVehicleNumber) {
+    if (await this.repository.findActiveByField("vehicleNumber", data.vehicleNumber)) {
       throw new Error("An active vehicle with this vehicle registration number already exists.");
     }
 
-    const existingEngineNumber = await Vehicle.findOne({
-      engineNumber: data.engineNumber.trim().toUpperCase(),
-      isActive: true,
-    });
-    if (existingEngineNumber) {
+    if (await this.repository.findActiveByField("engineNumber", data.engineNumber)) {
       throw new Error("An active vehicle with this engine number already exists.");
     }
 
-    const existingChassisNumber = await Vehicle.findOne({
-      chassisNumber: data.chassisNumber.trim().toUpperCase(),
-      isActive: true,
-    });
-    if (existingChassisNumber) {
+    if (await this.repository.findActiveByField("chassisNumber", data.chassisNumber)) {
       throw new Error("An active vehicle with this chassis number already exists.");
     }
 
-    const newVehicle = new Vehicle({
-      ...data,
-      vehicleNumber: data.vehicleNumber.trim().toUpperCase(),
-      engineNumber: data.engineNumber.trim().toUpperCase(),
-      chassisNumber: data.chassisNumber.trim().toUpperCase(),
-      createdBy: new mongoose.Types.ObjectId(userId),
-      updatedBy: new mongoose.Types.ObjectId(userId),
+    return this.repository.create({
+      customerId: data.customer,
+      vehicleNumber: data.vehicleNumber,
+      vehicleType: data.vehicleType,
+      manufacturer: data.manufacturer,
+      model: data.model,
+      year: data.year,
+      engineNumber: data.engineNumber,
+      chassisNumber: data.chassisNumber,
+      color: data.color,
+      isActive: data.isActive,
+      createdById: userId,
+      updatedById: userId,
     });
-
-    return await newVehicle.save();
   }
 
   /**
    * Update an existing Vehicle record
    */
-  static async updateVehicle(id: string, data: any, userId: string) {
-    await dbConnect();
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return null;
-    }
-
+  async updateVehicle(id: string, data: VehicleInput, userId: string) {
     // Check customer reference if modified
     if (data.customer) {
-      const customerExists = await Customer.findOne({
-        _id: new mongoose.Types.ObjectId(data.customer),
-        isActive: true,
-      });
-      if (!customerExists) {
+      const customer = await this.customerRepository.findById(data.customer);
+      if (!customer || !customer.isActive) {
         throw new Error("Associated customer not found or is currently inactive.");
       }
     }
 
     // Uniqueness audits for modified unique identifiers
-    const queryId = new mongoose.Types.ObjectId(id);
-
     if (data.vehicleNumber) {
-      const duplicateVehicleNumber = await Vehicle.findOne({
-        vehicleNumber: data.vehicleNumber.trim().toUpperCase(),
-        _id: { $ne: queryId },
-        isActive: true,
-      });
-      if (duplicateVehicleNumber) {
+      const duplicateVehicleNumber = await this.repository.findActiveByField("vehicleNumber", data.vehicleNumber);
+      if (duplicateVehicleNumber && duplicateVehicleNumber.id !== id) {
         throw new Error("Another active vehicle is already using this vehicle registration number.");
       }
     }
 
     if (data.engineNumber) {
-      const duplicateEngineNumber = await Vehicle.findOne({
-        engineNumber: data.engineNumber.trim().toUpperCase(),
-        _id: { $ne: queryId },
-        isActive: true,
-      });
-      if (duplicateEngineNumber) {
+      const duplicateEngineNumber = await this.repository.findActiveByField("engineNumber", data.engineNumber);
+      if (duplicateEngineNumber && duplicateEngineNumber.id !== id) {
         throw new Error("Another active vehicle is already using this engine number.");
       }
     }
 
     if (data.chassisNumber) {
-      const duplicateChassisNumber = await Vehicle.findOne({
-        chassisNumber: data.chassisNumber.trim().toUpperCase(),
-        _id: { $ne: queryId },
-        isActive: true,
-      });
-      if (duplicateChassisNumber) {
+      const duplicateChassisNumber = await this.repository.findActiveByField("chassisNumber", data.chassisNumber);
+      if (duplicateChassisNumber && duplicateChassisNumber.id !== id) {
         throw new Error("Another active vehicle is already using this chassis number.");
       }
     }
 
-    const updatePayload: any = { ...data };
-    if (data.vehicleNumber) updatePayload.vehicleNumber = data.vehicleNumber.trim().toUpperCase();
-    if (data.engineNumber) updatePayload.engineNumber = data.engineNumber.trim().toUpperCase();
-    if (data.chassisNumber) updatePayload.chassisNumber = data.chassisNumber.trim().toUpperCase();
-
-    updatePayload.updatedBy = new mongoose.Types.ObjectId(userId);
-
-    return await Vehicle.findByIdAndUpdate(
-      id,
-      updatePayload,
-      { new: true, runValidators: true }
-    );
+    try {
+      return await this.repository.update(id, {
+        customerId: data.customer,
+        vehicleNumber: data.vehicleNumber,
+        vehicleType: data.vehicleType,
+        manufacturer: data.manufacturer,
+        model: data.model,
+        year: data.year,
+        engineNumber: data.engineNumber,
+        chassisNumber: data.chassisNumber,
+        color: data.color,
+        isActive: data.isActive,
+        updatedById: userId,
+      });
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return null;
+      }
+      throw error;
+    }
   }
 
   /**
    * Soft delete (deactivate) a Vehicle
    * Strictly enforces business logic: Cannot deactivate if any policies exist for the vehicle.
    */
-  static async softDeleteVehicle(id: string, userId: string) {
-    await dbConnect();
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return { success: false, status: 404, message: "Vehicle not found." };
-    }
-
-    // Check if there are any active policies linked to this vehicle
-    const activePoliciesCount = await Policy.countDocuments({
-      vehicle: new mongoose.Types.ObjectId(id),
-      isActive: true,
-    });
+  async softDeleteVehicle(id: string, userId: string) {
+    const activePoliciesCount = await this.policyRepository.countActiveByVehicle(id);
 
     if (activePoliciesCount > 0) {
       return {
-        success: false,
+        success: false as const,
         status: 400,
         message: `Cannot deactivate vehicle. There are ${activePoliciesCount} active policy/policies linked to this vehicle.`,
       };
     }
 
-    const updatedVehicle = await Vehicle.findByIdAndUpdate(
-      id,
-      {
-        isActive: false,
-        updatedBy: new mongoose.Types.ObjectId(userId),
-      },
-      { new: true }
-    );
-
-    if (!updatedVehicle) {
-      return { success: false, status: 404, message: "Vehicle not found." };
+    try {
+      const updatedVehicle = await this.repository.update(id, { isActive: false, updatedById: userId });
+      return { success: true as const, vehicle: updatedVehicle };
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return { success: false as const, status: 404, message: "Vehicle not found." };
+      }
+      throw error;
     }
-
-    return { success: true, vehicle: updatedVehicle };
   }
 }

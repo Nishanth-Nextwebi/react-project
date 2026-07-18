@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { VehicleService } from "@/services/vehicleService";
 import { vehicleSchema } from "@/lib/validations";
+import { serializeVehicle } from "./_serialize";
+
+const vehicleService = new VehicleService();
 
 /**
  * GET /api/vehicles
@@ -27,7 +30,7 @@ export async function GET(req: NextRequest) {
     const includeInactive = searchParams.get("includeInactive") === "true";
     const customerId = searchParams.get("customerId") || undefined;
 
-    const data = await VehicleService.listVehicles({
+    const data = await vehicleService.listVehicles({
       page,
       limit,
       search,
@@ -40,7 +43,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Vehicles retrieved successfully.",
-      data,
+      data: {
+        vehicles: data.vehicles.map(serializeVehicle),
+        pagination: data.pagination,
+      },
     });
   } catch (error: any) {
     console.error("GET /api/vehicles error:", error);
@@ -67,7 +73,6 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
 
-    // Validate request body against Zod schema
     const validationResult = vehicleSchema.safeParse(body);
     if (!validationResult.success) {
       const errorDetails = validationResult.error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
@@ -81,16 +86,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const createdVehicle = await VehicleService.createVehicle(
-      validationResult.data,
-      session.user.id
-    );
+    const createdVehicle = await vehicleService.createVehicle(validationResult.data, session.user.id);
 
     return NextResponse.json(
       {
         success: true,
         message: "Vehicle registered successfully.",
-        data: createdVehicle,
+        data: serializeVehicle(createdVehicle),
       },
       { status: 201 }
     );

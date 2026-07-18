@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { dbConnect } from "@/lib/mongodb";
-import User from "@/models/User";
-import bcrypt from "bcryptjs";
+import { UserService } from "@/services/userService";
+
+const userService = new UserService();
 
 export async function GET() {
   // Prevent execution in production
@@ -13,36 +13,23 @@ export async function GET() {
   }
 
   try {
-    await dbConnect();
+    const result = await userService.ensureDefaultAdmin();
 
-    // Check if admin user already exists
-    const adminExists = await User.findOne({ role: "admin" });
-
-    if (adminExists) {
+    if (result.alreadyInitialized) {
       return NextResponse.json(
         { message: "System is already initialized. Admin user already exists." },
         { status: 200 }
       );
     }
 
-    // Create a default administrator
-    const hashedAdminPassword = await bcrypt.hash("Admin123!", 10);
-    const defaultAdmin = await User.create({
-      name: "System Administrator",
-      email: "admin@insurance.com",
-      password: hashedAdminPassword,
-      role: "admin",
-      isActive: true,
-    });
-
     return NextResponse.json(
       {
         message: "Database and administrator provisioned successfully.",
         credentials: {
           admin: {
-            email: defaultAdmin.email,
+            email: result.admin.email,
             password: "Admin123!",
-            role: defaultAdmin.role,
+            role: result.admin.role,
           },
         },
       },

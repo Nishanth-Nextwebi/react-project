@@ -1,42 +1,33 @@
-import { dbConnect } from "@/lib/mongodb";
-import ActivityLog from "@/models/ActivityLog";
-import mongoose from "mongoose";
+import { ActivityRepository } from "@/repositories/ActivityRepository";
 
 export class ActivityService {
+  private static repository = new ActivityRepository();
+
   /**
-   * Log an administrative or system action
+   * Log an administrative or system action. Swallows its own errors so a
+   * logging failure never fails the parent request - matches the original
+   * Mongoose implementation exactly.
    */
   static async log(userId: string | undefined, userName: string | undefined, action: string, details: string) {
     try {
-      await dbConnect();
-      const payload: any = {
+      await this.repository.create({
         action,
         details,
-      };
-
-      if (userId && mongoose.Types.ObjectId.isValid(userId)) {
-        payload.user = new mongoose.Types.ObjectId(userId);
-      }
-      if (userName) {
-        payload.userName = userName;
-      }
-
-      await ActivityLog.create(payload);
+        userId: userId || undefined,
+        userName: userName || undefined,
+      });
     } catch (error) {
       console.error("Failed to persist activity log:", error);
     }
   }
 
   /**
-   * Fetch recent activity logs
+   * Fetch recent activity logs, with the user relation populated (name,
+   * email, role) - matches the original `.populate("user", "name email role")`.
    */
   static async getRecentLogs(limit = 10) {
     try {
-      await dbConnect();
-      return await ActivityLog.find()
-        .sort({ createdAt: -1 })
-        .limit(limit)
-        .populate("user", "name email role");
+      return await this.repository.findRecentWithUser(limit);
     } catch (error) {
       console.error("Failed to retrieve activity logs:", error);
       return [];

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { dbConnect } from "@/lib/mongodb";
-import User from "@/models/User";
-import bcrypt from "bcryptjs";
-import { ActivityService } from "@/services/activityService";
+import { UserService } from "@/services/userService";
+
+const userService = new UserService();
 
 /**
  * GET /api/users
@@ -20,12 +19,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    await dbConnect();
-    const users = await User.find({}, { password: 0 }).sort({ createdAt: -1 });
+    const users = await userService.listUsers();
 
     return NextResponse.json({
       success: true,
-      users,
+      users: users.map((user) => ({ ...user, _id: user.id })),
     });
   } catch (error: any) {
     console.error("GET /api/users error:", error);
@@ -47,60 +45,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { name, email, password, role } = await req.json();
+    const body = await req.json();
+    const result = await userService.createUser(body, session.user.id, session.user.name || undefined);
 
-    if (!name || !email || !password || !role) {
+    if (!result.success) {
       return NextResponse.json(
-        { success: false, message: "Missing required fields.", errors: ["Name, email, password, and role are required."] },
-        { status: 400 }
+        { success: false, message: result.message, errors: result.errors },
+        { status: result.status }
       );
     }
-
-    await dbConnect();
-
-    // Check email uniqueness
-    const emailClean = email.trim().toLowerCase();
-    const existingUser = await User.findOne({ email: emailClean });
-    if (existingUser) {
-      return NextResponse.json(
-        { success: false, message: "User registration failed.", errors: ["A user with this email address is already registered."] },
-        { status: 400 }
-      );
-    }
-
-    // Securely hash the password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    const newUser = new User({
-      name: name.trim(),
-      email: emailClean,
-      password: hashedPassword,
-      role,
-      isActive: true,
-    });
-
-    await newUser.save();
-
-    // Log user creation
-    await ActivityService.log(
-      session.user.id,
-      session.user.name || undefined,
-      "User Actions",
-      `Onboarded new system user "${newUser.name}" with role "${newUser.role}"`
-    );
 
     return NextResponse.json(
       {
         success: true,
         message: "User onboarded successfully.",
-        user: {
-          id: newUser._id,
-          name: newUser.name,
-          email: newUser.email,
-          role: newUser.role,
-          isActive: newUser.isActive,
-        },
+        user: result.user,
       },
       { status: 201 }
     );

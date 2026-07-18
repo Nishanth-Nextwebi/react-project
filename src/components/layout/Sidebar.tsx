@@ -158,7 +158,7 @@ export default function Sidebar({ className = "" }: SidebarProps) {
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
           <div className="flex flex-col">
             <span className="text-[11px] font-semibold text-neutral-700 leading-none">Database Status</span>
-            <span className="text-[10px] text-neutral-400 mt-1">MongoDB Atlas Connected</span>
+            <span className="text-[10px] text-neutral-400 mt-1">MySQL Connected</span>
           </div>
         </div>
       </div>

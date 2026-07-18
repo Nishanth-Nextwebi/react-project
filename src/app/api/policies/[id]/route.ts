@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { PolicyService } from "@/services/policyService";
 import { policySchema } from "@/lib/validations";
+import { serializePolicy } from "../_serialize";
+
+const policyService = new PolicyService();
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -23,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const policy = await PolicyService.getPolicyById(id);
+    const policy = await policyService.getPolicyById(id);
 
     if (!policy) {
       return NextResponse.json(
@@ -35,7 +38,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Policy retrieved successfully.",
-      data: policy,
+      data: serializePolicy(policy),
     });
   } catch (error: any) {
     console.error("GET /api/policies/[id] error:", error);
@@ -76,11 +79,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    const updatedPolicy = await PolicyService.updatePolicy(
-      id,
-      validationResult.data,
-      session.user.id
-    );
+    const updatedPolicy = await policyService.updatePolicy(id, validationResult.data, session.user.id);
 
     if (!updatedPolicy) {
       return NextResponse.json(
@@ -92,7 +91,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Policy updated successfully.",
-      data: updatedPolicy,
+      data: serializePolicy(updatedPolicy),
     });
   } catch (error: any) {
     console.error("PUT /api/policies/[id] error:", error);
@@ -122,7 +121,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const result = await PolicyService.softDeletePolicy(id, session.user.id);
+    const result = await policyService.softDeletePolicy(id, session.user.id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -134,7 +133,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Policy deactivated successfully.",
-      data: result.policy,
+      data: serializePolicy(result.policy),
     });
   } catch (error: any) {
     console.error("DELETE /api/policies/[id] error:", error);

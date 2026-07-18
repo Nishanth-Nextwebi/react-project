@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { PolicyService } from "@/services/policyService";
 import { policySchema } from "@/lib/validations";
+import { serializePolicy } from "./_serialize";
+
+const policyService = new PolicyService();
 
 /**
  * GET /api/policies
@@ -28,7 +31,7 @@ export async function GET(req: NextRequest) {
     const customerId = searchParams.get("customerId") || undefined;
     const vehicleId = searchParams.get("vehicleId") || undefined;
 
-    const data = await PolicyService.listPolicies({
+    const data = await policyService.listPolicies({
       page,
       limit,
       search,
@@ -42,7 +45,10 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: "Policies retrieved successfully.",
-      data,
+      data: {
+        policies: data.policies.map(serializePolicy),
+        pagination: data.pagination,
+      },
     });
   } catch (error: any) {
     console.error("GET /api/policies error:", error);
@@ -68,8 +74,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    
-    // Validate request body against Zod validation rules
+
     const validationResult = policySchema.safeParse(body);
     if (!validationResult.success) {
       const errorDetails = validationResult.error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
@@ -83,16 +88,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const createdPolicy = await PolicyService.createPolicy(
-      validationResult.data,
-      session.user.id
-    );
+    const createdPolicy = await policyService.createPolicy(validationResult.data, session.user.id);
 
     return NextResponse.json(
       {
         success: true,
         message: "Policy created successfully.",
-        data: createdPolicy,
+        data: serializePolicy(createdPolicy),
       },
       { status: 201 }
     );

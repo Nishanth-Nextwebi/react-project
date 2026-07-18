@@ -1,8 +1,8 @@
-import mongoose from "mongoose";
-import { dbConnect } from "@/lib/mongodb";
-import Policy, { IPolicy } from "@/models/Policy";
-import Customer from "@/models/Customer";
-import Vehicle from "@/models/Vehicle";
+import { PolicyRepository } from "@/repositories/PolicyRepository";
+import { CustomerRepository } from "@/repositories/CustomerRepository";
+import { VehicleRepository } from "@/repositories/VehicleRepository";
+import type { PolicyInput } from "@/lib/validations";
+import type { Prisma } from "@/generated/prisma/client";
 
 export interface PolicyPaginationParams {
   page: number;
@@ -16,52 +16,52 @@ export interface PolicyPaginationParams {
 }
 
 export class PolicyService {
+  private readonly repository: PolicyRepository;
+  private readonly customerRepository: CustomerRepository;
+  private readonly vehicleRepository: VehicleRepository;
+
+  constructor(
+    repository: PolicyRepository = new PolicyRepository(),
+    customerRepository: CustomerRepository = new CustomerRepository(),
+    vehicleRepository: VehicleRepository = new VehicleRepository()
+  ) {
+    this.repository = repository;
+    this.customerRepository = customerRepository;
+    this.vehicleRepository = vehicleRepository;
+  }
+
   /**
    * Fetch paginated, sorted, and filtered policies
    */
-  static async listPolicies(params: PolicyPaginationParams) {
-    await dbConnect();
-
+  async listPolicies(params: PolicyPaginationParams) {
     const { page, limit, search, sortBy, sortOrder, includeInactive = false, customerId, vehicleId } = params;
     const skip = (page - 1) * limit;
 
-    const query: any = {};
+    const where: Prisma.PolicyWhereInput = {};
     if (!includeInactive) {
-      query.isActive = true;
+      where.isActive = true;
     }
 
-    if (customerId && mongoose.Types.ObjectId.isValid(customerId)) {
-      query.customer = new mongoose.Types.ObjectId(customerId);
+    if (customerId) {
+      where.customerId = customerId;
     }
 
-    if (vehicleId && mongoose.Types.ObjectId.isValid(vehicleId)) {
-      query.vehicle = new mongoose.Types.ObjectId(vehicleId);
+    if (vehicleId) {
+      where.vehicleId = vehicleId;
     }
 
     if (search) {
-      // Case-insensitive search on Policy Number or Insurance Company
-      const searchRegex = new RegExp(search, "i");
-      query.$or = [
-        { policyNumber: searchRegex },
-        { insuranceCompany: searchRegex },
-        { policyType: searchRegex },
+      // Case-insensitive search on Policy Number, Insurance Company, or Policy Type
+      where.OR = [
+        { policyNumber: { contains: search } },
+        { insuranceCompany: { contains: search } },
+        { policyType: { contains: search } },
       ];
     }
 
-    const sortOptions: any = {};
-    sortOptions[sortBy] = sortOrder === "desc" ? -1 : 1;
+    const orderBy: Prisma.PolicyOrderByWithRelationInput = { [sortBy]: sortOrder };
 
-    const [policies, total] = await Promise.all([
-      Policy.find(query)
-        .sort(sortOptions)
-        .skip(skip)
-        .limit(limit)
-        .populate("customer", "name phone email address")
-        .populate("vehicle", "vehicleNumber vehicleType manufacturer model year chassisNumber engineNumber")
-        .populate("createdBy", "name email")
-        .populate("updatedBy", "name email"),
-      Policy.countDocuments(query),
-    ]);
+    const { policies, total } = await this.repository.findMany({ skip, take: limit, where, orderBy });
 
     return {
       policies,
@@ -77,116 +77,103 @@ export class PolicyService {
   /**
    * Find a single policy by ID
    */
-  static async getPolicyById(id: string) {
-    await dbConnect();
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return null;
-    }
-    return await Policy.findById(id)
-      .populate("customer", "name phone email address")
-      .populate("vehicle", "vehicleNumber vehicleType manufacturer model year chassisNumber engineNumber")
-      .populate("createdBy", "name email")
-      .populate("updatedBy", "name email");
+  async getPolicyById(id: string) {
+    return this.repository.findById(id);
   }
 
   /**
-   * Create a new Policy record
+   * Create a new Policy record. Unlike vehicle creation, customer/vehicle
+   * existence checks here do NOT filter on isActive - matches the original
+   * PolicyService.createPolicy exactly.
    */
-  static async createPolicy(data: any, userId: string) {
-    await dbConnect();
-
-    // Verify customer exists
-    const customerExists = await Customer.findOne({
-      _id: new mongoose.Types.ObjectId(data.customer),
-    });
+  async createPolicy(data: PolicyInput, userId: string) {
+    const customerExists = await this.customerRepository.findById(data.customer as string);
     if (!customerExists) {
       throw new Error("Associated customer not found.");
     }
 
-    // Verify vehicle exists
-    const vehicleExists = await Vehicle.findOne({
-      _id: new mongoose.Types.ObjectId(data.vehicle),
-    });
+    const vehicleExists = await this.vehicleRepository.findById(data.vehicle as string);
     if (!vehicleExists) {
       throw new Error("Associated vehicle not found.");
     }
 
-    // Check if policy number is already in use
-    const existingPolicy = await Policy.findOne({
-      policyNumber: data.policyNumber.trim().toUpperCase(),
-    });
+    const policyNumberClean = data.policyNumber.trim().toUpperCase();
+    const existingPolicy = await this.repository.findByPolicyNumber(policyNumberClean);
     if (existingPolicy) {
-      throw new Error(`A policy with the number '${data.policyNumber.trim().toUpperCase()}' already exists.`);
+      throw new Error(`A policy with the number '${policyNumberClean}' already exists.`);
     }
 
-    const newPolicy = new Policy({
-      ...data,
-      policyNumber: data.policyNumber.trim().toUpperCase(),
-      createdBy: new mongoose.Types.ObjectId(userId),
-      updatedBy: new mongoose.Types.ObjectId(userId),
+    return this.repository.create({
+      customerId: data.customer as string,
+      vehicleId: data.vehicle as string,
+      policyNumber: policyNumberClean,
+      insuranceCompany: data.insuranceCompany,
+      policyType: data.policyType,
+      premiumAmount: data.premiumAmount,
+      startDate: data.startDate,
+      expiryDate: data.expiryDate,
+      extraField1: data.extraField1,
+      extraField2: data.extraField2,
+      extraField3: data.extraField3,
+      comments: data.comments,
+      attachmentUrl: data.attachmentUrl,
+      isActive: data.isActive,
+      createdById: userId,
+      updatedById: userId,
     });
-
-    return await newPolicy.save();
   }
 
   /**
    * Update an existing Policy record
    */
-  static async updatePolicy(id: string, data: any, userId: string) {
-    await dbConnect();
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return null;
-    }
-
-    const queryId = new mongoose.Types.ObjectId(id);
-
+  async updatePolicy(id: string, data: PolicyInput, userId: string) {
+    let policyNumberClean: string | undefined;
     if (data.policyNumber) {
-      const duplicatePolicy = await Policy.findOne({
-        policyNumber: data.policyNumber.trim().toUpperCase(),
-        _id: { $ne: queryId },
-      });
-      if (duplicatePolicy) {
-        throw new Error(`Another policy with number '${data.policyNumber.trim().toUpperCase()}' already exists.`);
+      policyNumberClean = data.policyNumber.trim().toUpperCase();
+      const duplicatePolicy = await this.repository.findByPolicyNumber(policyNumberClean);
+      if (duplicatePolicy && duplicatePolicy.id !== id) {
+        throw new Error(`Another policy with number '${policyNumberClean}' already exists.`);
       }
     }
 
-    const updatePayload = {
-      ...data,
-      updatedBy: new mongoose.Types.ObjectId(userId),
-    };
-    if (data.policyNumber) {
-      updatePayload.policyNumber = data.policyNumber.trim().toUpperCase();
+    try {
+      return await this.repository.update(id, {
+        customerId: data.customer as string | undefined,
+        vehicleId: data.vehicle as string | undefined,
+        policyNumber: policyNumberClean,
+        insuranceCompany: data.insuranceCompany,
+        policyType: data.policyType,
+        premiumAmount: data.premiumAmount,
+        startDate: data.startDate,
+        expiryDate: data.expiryDate,
+        extraField1: data.extraField1,
+        extraField2: data.extraField2,
+        extraField3: data.extraField3,
+        comments: data.comments,
+        attachmentUrl: data.attachmentUrl,
+        isActive: data.isActive,
+        updatedById: userId,
+      });
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return null;
+      }
+      throw error;
     }
-
-    return await Policy.findByIdAndUpdate(
-      id,
-      updatePayload,
-      { new: true, runValidators: true }
-    );
   }
 
   /**
    * Delete or deactivate a Policy (Soft delete by default)
    */
-  static async softDeletePolicy(id: string, userId: string) {
-    await dbConnect();
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return { success: false, status: 404, message: "Policy not found." };
+  async softDeletePolicy(id: string, userId: string) {
+    try {
+      const updatedPolicy = await this.repository.update(id, { isActive: false, updatedById: userId });
+      return { success: true as const, policy: updatedPolicy };
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return { success: false as const, status: 404, message: "Policy not found." };
+      }
+      throw error;
     }
-
-    const updatedPolicy = await Policy.findByIdAndUpdate(
-      id,
-      {
-        isActive: false,
-        updatedBy: new mongoose.Types.ObjectId(userId),
-      },
-      { new: true }
-    );
-
-    if (!updatedPolicy) {
-      return { success: false, status: 404, message: "Policy not found." };
-    }
-
-    return { success: true, policy: updatedPolicy };
   }
 }

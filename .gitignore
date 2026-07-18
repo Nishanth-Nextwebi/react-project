@@ -6,3 +6,5 @@ dist/
 coverage/
 .env*
 !.env.example
+
+/src/generated/prisma

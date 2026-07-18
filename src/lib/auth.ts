@@ -1,9 +1,11 @@
+import "@/lib/env";
 import { AuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { dbConnect } from "@/lib/mongodb";
-import User from "@/models/User";
+import { UserRepository } from "@/repositories/UserRepository";
+
+const userRepository = new UserRepository();
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -22,8 +24,7 @@ export const authOptions: AuthOptions = {
           throw new Error("Email and password are required");
         }
 
-        await dbConnect();
-        const user = await User.findOne({ email: credentials.email.toLowerCase() });
+        const user = await userRepository.findByEmail(credentials.email.toLowerCase());
 
         if (!user) {
           throw new Error("Invalid email or password");
@@ -45,7 +46,7 @@ export const authOptions: AuthOptions = {
         }
 
         return {
-          id: user._id.toString(),
+          id: user.id,
           email: user.email,
           name: user.name,
           role: user.role,
@@ -56,31 +57,29 @@ export const authOptions: AuthOptions = {
   callbacks: {
     async signIn({ user, account, profile }) {
       if (account?.provider === "google") {
-        await dbConnect();
-        let dbUser = await User.findOne({ email: user.email?.toLowerCase() });
+        let dbUser = await userRepository.findByEmail(user.email!.toLowerCase());
 
         if (!dbUser) {
           // Create the user as an employee by default on first Google login
-          dbUser = await User.create({
+          dbUser = await userRepository.create({
             name: user.name || "Google User",
             email: user.email!.toLowerCase(),
             role: "employee",
             isActive: true,
-            googleId: profile?.sub,
+            googleId: (profile as any)?.sub,
           });
         } else {
           if (!dbUser.isActive) {
             return false; // Reject sign-in
           }
           if (!dbUser.googleId) {
-            dbUser.googleId = profile?.sub;
-            await dbUser.save();
+            dbUser = await userRepository.update(dbUser.id, { googleId: (profile as any)?.sub });
           }
         }
-        
+
         // Populate custom properties
         user.role = dbUser.role;
-        user.id = dbUser._id.toString();
+        user.id = dbUser.id;
       }
       return true;
     },
@@ -120,5 +119,9 @@ export const authOptions: AuthOptions = {
       },
     },
   },
-  secret: process.env.NEXTAUTH_SECRET || "fallback-secret-for-local-dev-only-replace-later",
+  // No fallback value here deliberately: src/lib/env.ts already fails the
+  // app at startup if NEXTAUTH_SECRET is missing, so silently falling back
+  // to a hardcoded secret (visible in source control) is never reachable
+  // and would only mask a misconfigured deployment.
+  secret: process.env.NEXTAUTH_SECRET as string,
 };

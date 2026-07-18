@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { CustomerService } from "@/services/customerService";
 import { customerSchema } from "@/lib/validations";
+import { serializeCustomer } from "../_serialize";
+
+const customerService = new CustomerService();
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -23,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const customer = await CustomerService.getCustomerById(id);
+    const customer = await customerService.getCustomerById(id);
 
     if (!customer) {
       return NextResponse.json(
@@ -35,7 +38,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Customer retrieved successfully.",
-      data: customer,
+      data: serializeCustomer(customer),
     });
   } catch (error: any) {
     console.error("GET /api/customers/[id] error:", error);
@@ -63,7 +66,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const body = await req.json();
 
-    // Run partial validation or full validation depending on update strategies
     const validationResult = customerSchema.safeParse(body);
     if (!validationResult.success) {
       const errorDetails = validationResult.error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
@@ -77,11 +79,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    const updatedCustomer = await CustomerService.updateCustomer(
-      id,
-      validationResult.data,
-      session.user.id
-    );
+    const updatedCustomer = await customerService.updateCustomer(id, validationResult.data, session.user.id);
 
     if (!updatedCustomer) {
       return NextResponse.json(
@@ -93,7 +91,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Customer updated successfully.",
-      data: updatedCustomer,
+      data: serializeCustomer(updatedCustomer),
     });
   } catch (error: any) {
     console.error("PUT /api/customers/[id] error:", error);
@@ -125,7 +123,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const result = await CustomerService.softDeleteCustomer(id, session.user.id);
+    const result = await customerService.softDeleteCustomer(id, session.user.id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -137,7 +135,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Customer deactivated successfully.",
-      data: result.customer,
+      data: serializeCustomer(result.customer),
     });
   } catch (error: any) {
     console.error("DELETE /api/customers/[id] error:", error);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { ActivityService } from "@/services/activityService";
+import { serializeActivityLog } from "./_serialize";
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,7 +12,7 @@ export async function GET(req: NextRequest) {
     }
 
     const logs = await ActivityService.getRecentLogs(20);
-    return NextResponse.json({ success: true, logs });
+    return NextResponse.json({ success: true, logs: logs.map(serializeActivityLog) });
   } catch (error: any) {
     return NextResponse.json({ success: false, message: error.message }, { status: 500 });
   }

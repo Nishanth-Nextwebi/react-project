@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
 import { VehicleService } from "@/services/vehicleService";
 import { vehicleSchema } from "@/lib/validations";
+import { serializeVehicle } from "../_serialize";
+
+const vehicleService = new VehicleService();
 
 type Params = {
   params: Promise<{ id: string }>;
@@ -23,7 +26,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const vehicle = await VehicleService.getVehicleById(id);
+    const vehicle = await vehicleService.getVehicleById(id);
 
     if (!vehicle) {
       return NextResponse.json(
@@ -35,7 +38,7 @@ export async function GET(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Vehicle retrieved successfully.",
-      data: vehicle,
+      data: serializeVehicle(vehicle),
     });
   } catch (error: any) {
     console.error("GET /api/vehicles/[id] error:", error);
@@ -63,7 +66,6 @@ export async function PUT(req: NextRequest, { params }: Params) {
     const { id } = await params;
     const body = await req.json();
 
-    // Run schema validation on incoming updates
     const validationResult = vehicleSchema.safeParse(body);
     if (!validationResult.success) {
       const errorDetails = validationResult.error.issues.map((err) => `${err.path.join(".")}: ${err.message}`);
@@ -77,11 +79,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       );
     }
 
-    const updatedVehicle = await VehicleService.updateVehicle(
-      id,
-      validationResult.data,
-      session.user.id
-    );
+    const updatedVehicle = await vehicleService.updateVehicle(id, validationResult.data, session.user.id);
 
     if (!updatedVehicle) {
       return NextResponse.json(
@@ -93,7 +91,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Vehicle updated successfully.",
-      data: updatedVehicle,
+      data: serializeVehicle(updatedVehicle),
     });
   } catch (error: any) {
     console.error("PUT /api/vehicles/[id] error:", error);
@@ -132,7 +130,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const result = await VehicleService.softDeleteVehicle(id, session.user.id);
+    const result = await vehicleService.softDeleteVehicle(id, session.user.id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -144,7 +142,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({
       success: true,
       message: "Vehicle deactivated successfully.",
-      data: result.vehicle,
+      data: serializeVehicle(result.vehicle),
     });
   } catch (error: any) {
     console.error("DELETE /api/vehicles/[id] error:", error);
