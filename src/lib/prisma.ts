@@ -12,12 +12,29 @@ const globalForPrisma = global as unknown as { prisma?: PrismaClient };
 // connection string, which hits a config-defaulting bug in this adapter version.
 const databaseUrl = new URL(process.env.DATABASE_URL as string);
 
-// Configurable pool size (mariadb driver default is 10) - production hosts
-// with limited max_connections should tune this via DATABASE_CONNECTION_LIMIT
-// rather than editing code.
+// Configurable pool size (mariadb driver default is 10). On Vercel, every
+// concurrent serverless function instance holds its own pool - a pool of 10
+// per instance multiplies fast under concurrency and can exceed Aiven's
+// max_connections, and a large pool is also slower to establish from cold.
+// Default to a small pool automatically when VERCEL is set (Vercel injects
+// this env var into every deployment); DATABASE_CONNECTION_LIMIT still
+// overrides it explicitly in either environment.
 const connectionLimit = process.env.DATABASE_CONNECTION_LIMIT
   ? Number(process.env.DATABASE_CONNECTION_LIMIT)
-  : undefined;
+  : process.env.VERCEL
+    ? 3
+    : undefined;
+
+// Serverless functions can be frozen (all JS execution paused) between
+// invocations and thawed later for a "warm" reuse. mariadb's default
+// idleTimeout (30 minutes) lets a pooled connection sit far longer than a
+// freeze can last, so a connection borrowed after a thaw can be a zombie
+// socket the pool still believes is valid - the driver hangs waiting on a
+// dead connection instead of erroring, which is exactly the
+// "pool timeout ... active=0 idle=0" symptom. Keep pooled connections short
+// enough that a stale one is dropped and replaced well within any plausible
+// freeze/thaw window.
+const idleTimeout = process.env.VERCEL ? 30 : undefined;
 
 // Managed MySQL providers (e.g. Aiven) reject plaintext connections and
 // require TLS. DATABASE_URL carries this as a `ssl-mode`/`sslmode` query
@@ -48,6 +65,7 @@ const adapter = new PrismaMariaDb({
   password: decodeURIComponent(databaseUrl.password),
   database: databaseUrl.pathname.replace(/^\//, ""),
   connectionLimit,
+  idleTimeout,
   ssl,
   // MySQL 8's default caching_sha2_password auth plugin needs the client to
   // fetch the server's RSA public key to encrypt the password, which is only
@@ -59,8 +77,14 @@ const adapter = new PrismaMariaDb({
   allowPublicKeyRetrieval: !ssl,
 });
 
+// Cache on `global` in every environment, not just outside production. This
+// was previously gated to non-production (a convention meant to stop
+// Next.js dev-mode hot-reload from spawning duplicate clients), but on
+// Vercel that gate meant every serverless invocation built a brand new
+// PrismaMariaDb adapter - and therefore a brand new mariadb connection
+// pool - from scratch, discarding any already-established connections and
+// re-doing the TCP/TLS handshake with Aiven on every request. Within a
+// warm (reused) function container, caching lets later invocations reuse
+// the pool that's already connected instead of rebuilding it every time.
 export const prisma = globalForPrisma.prisma ?? new PrismaClient({ adapter });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
-}
+globalForPrisma.prisma = prisma;
