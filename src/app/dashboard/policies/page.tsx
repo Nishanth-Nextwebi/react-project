@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import {
   Search,
   Plus,
@@ -70,7 +71,19 @@ interface Policy {
   createdAt: string;
 }
 
-export default function PoliciesPage() {
+type PolicyStatusFilter = "" | "active" | "expired" | "expiringSoon" | "today" | "newThisMonth";
+
+const STATUS_FILTER_OPTIONS: { value: PolicyStatusFilter; label: string }[] = [
+  { value: "", label: "All" },
+  { value: "active", label: "Active" },
+  { value: "expired", label: "Expired" },
+  { value: "expiringSoon", label: "Expiring 30d" },
+  { value: "today", label: "Expiring Today" },
+  { value: "newThisMonth", label: "New This Month" },
+];
+
+function PoliciesPageContent() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<"form" | "list">("form");
 
   // Form State
@@ -109,12 +122,43 @@ export default function PoliciesPage() {
   // Policy List State
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [loadingPolicies, setLoadingPolicies] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [sortBy, setSortBy] = useState("createdAt");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
+
+  // Policy List Filters
+  const [filterCustomerName, setFilterCustomerName] = useState("");
+  const [filterPolicyNumber, setFilterPolicyNumber] = useState("");
+  const [filterPhone, setFilterPhone] = useState("");
+  const [filterVehicleNumber, setFilterVehicleNumber] = useState("");
+  const [filterInsuranceCompany, setFilterInsuranceCompany] = useState("");
+  const [filterExpiryFrom, setFilterExpiryFrom] = useState("");
+  const [filterExpiryTo, setFilterExpiryTo] = useState("");
+  const [statusFilter, setStatusFilter] = useState<PolicyStatusFilter>("");
+
+  const hasActiveFilters =
+    !!filterCustomerName ||
+    !!filterPolicyNumber ||
+    !!filterPhone ||
+    !!filterVehicleNumber ||
+    !!filterInsuranceCompany ||
+    !!filterExpiryFrom ||
+    !!filterExpiryTo ||
+    !!statusFilter;
+
+  const resetFilters = () => {
+    setFilterCustomerName("");
+    setFilterPolicyNumber("");
+    setFilterPhone("");
+    setFilterVehicleNumber("");
+    setFilterInsuranceCompany("");
+    setFilterExpiryFrom("");
+    setFilterExpiryTo("");
+    setStatusFilter("");
+    setPage(1);
+  };
 
   // View Details Drawer
   const [selectedPolicy, setSelectedPolicy] = useState<Policy | null>(null);
@@ -164,11 +208,23 @@ export default function PoliciesPage() {
   const fetchPolicies = useCallback(async () => {
     setLoadingPolicies(true);
     try {
-      const res = await fetch(
-        `/api/policies?page=${page}&limit=8&search=${encodeURIComponent(
-          searchQuery
-        )}&sortBy=${sortBy}&sortOrder=${sortOrder}&includeInactive=true`
-      );
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: "8",
+        sortBy,
+        sortOrder,
+        includeInactive: "true",
+      });
+      if (filterCustomerName.trim()) params.set("customerName", filterCustomerName.trim());
+      if (filterPolicyNumber.trim()) params.set("policyNumber", filterPolicyNumber.trim());
+      if (filterPhone.trim()) params.set("phone", filterPhone.trim());
+      if (filterVehicleNumber.trim()) params.set("vehicleNumber", filterVehicleNumber.trim());
+      if (filterInsuranceCompany.trim()) params.set("insuranceCompany", filterInsuranceCompany.trim());
+      if (filterExpiryFrom) params.set("expiryFrom", filterExpiryFrom);
+      if (filterExpiryTo) params.set("expiryTo", filterExpiryTo);
+      if (statusFilter) params.set("status", statusFilter);
+
+      const res = await fetch(`/api/policies?${params.toString()}`);
       const result = await res.json();
       if (result.success) {
         setPolicies(result.data.policies || []);
@@ -183,13 +239,52 @@ export default function PoliciesPage() {
     } finally {
       setLoadingPolicies(false);
     }
-  }, [page, searchQuery, sortBy, sortOrder]);
+  }, [
+    page,
+    sortBy,
+    sortOrder,
+    filterCustomerName,
+    filterPolicyNumber,
+    filterPhone,
+    filterVehicleNumber,
+    filterInsuranceCompany,
+    filterExpiryFrom,
+    filterExpiryTo,
+    statusFilter,
+  ]);
 
+  // Free-text filters are debounced so 10,000+ record searches don't fire on every keystroke.
+  useEffect(() => {
+    const delayDebounce = setTimeout(() => {
+      setPage(1);
+      if (activeTab === "list") {
+        fetchPolicies();
+      }
+    }, 450);
+    return () => clearTimeout(delayDebounce);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterCustomerName, filterPolicyNumber, filterPhone, filterVehicleNumber, filterInsuranceCompany]);
+
+  // Page, sort, date range, and status changes (or opening the tab) fetch immediately.
   useEffect(() => {
     if (activeTab === "list") {
       fetchPolicies();
     }
-  }, [activeTab, fetchPolicies]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, page, sortBy, sortOrder, filterExpiryFrom, filterExpiryTo, statusFilter]);
+
+  // Deep-link support: /dashboard/policies?tab=list&status=active from the dashboard stat cards.
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    const statusParam = searchParams.get("status") as PolicyStatusFilter | null;
+    if (tabParam === "list") {
+      setActiveTab("list");
+    }
+    if (statusParam && STATUS_FILTER_OPTIONS.some((opt) => opt.value === statusParam)) {
+      setStatusFilter(statusParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   // 2. Real-time Customer Phone Lookup
   const lookupCustomerByPhone = async (phoneVal: string) => {
@@ -963,38 +1058,123 @@ export default function PoliciesPage() {
             className="bg-white rounded-2xl border border-neutral-100 shadow-sm overflow-hidden"
           >
             {/* Filter controls */}
-            <div className="p-5 border-b border-neutral-100 bg-neutral-50/30 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
-                <input
-                  type="text"
-                  placeholder="Search policy number, company, or type..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    setPage(1);
-                  }}
-                  className="w-full rounded-xl border border-neutral-200 pl-10 pr-4 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                />
+            <div id="policies_filter_panel" className="p-5 border-b border-neutral-100 bg-neutral-50/30 space-y-4">
+              {/* Row 1: distinct field filters */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Customer Name</label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-neutral-400" />
+                    <input
+                      type="text"
+                      placeholder="e.g. Rahul Sharma"
+                      value={filterCustomerName}
+                      onChange={(e) => setFilterCustomerName(e.target.value)}
+                      className="w-full rounded-xl border border-neutral-200 pl-8 pr-3 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Policy Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. POL-12345678"
+                    value={filterPolicyNumber}
+                    onChange={(e) => setFilterPolicyNumber(e.target.value)}
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Phone</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 9876543210"
+                    value={filterPhone}
+                    onChange={(e) => setFilterPhone(e.target.value)}
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Vehicle Number</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. MH12AB1234"
+                    value={filterVehicleNumber}
+                    onChange={(e) => setFilterVehicleNumber(e.target.value.toUpperCase())}
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Insurance Company</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Tata AIG"
+                    value={filterInsuranceCompany}
+                    onChange={(e) => setFilterInsuranceCompany(e.target.value)}
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
-                <button
-                  onClick={() => {
-                    setSearchQuery("");
-                    setPage(1);
-                  }}
-                  className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer"
-                >
-                  Reset List
-                </button>
-                <button
-                  onClick={fetchPolicies}
-                  className="rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-3.5 py-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" />
-                  Refresh
-                </button>
+              {/* Row 2: expiry date range, status quick-filters, and actions */}
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <div className="flex flex-wrap items-end gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Expiry From</label>
+                    <input
+                      type="date"
+                      value={filterExpiryFrom}
+                      onChange={(e) => setFilterExpiryFrom(e.target.value)}
+                      className="rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Expiry To</label>
+                    <input
+                      type="date"
+                      value={filterExpiryTo}
+                      onChange={(e) => setFilterExpiryTo(e.target.value)}
+                      className="rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {STATUS_FILTER_OPTIONS.map((opt) => (
+                    <button
+                      key={opt.value || "all"}
+                      onClick={() => setStatusFilter(opt.value)}
+                      className={`rounded-lg px-3 py-1.5 text-[11px] font-bold transition-all cursor-pointer ${
+                        statusFilter === opt.value
+                          ? "bg-blue-600 text-white shadow-sm"
+                          : "bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50"
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex items-center gap-2 self-end lg:self-auto shrink-0">
+                  <button
+                    onClick={resetFilters}
+                    disabled={!hasActiveFilters}
+                    className="rounded-xl border border-neutral-200 bg-white px-4 py-2 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    Reset Filters
+                  </button>
+                  <button
+                    onClick={fetchPolicies}
+                    className="rounded-xl bg-neutral-100 hover:bg-neutral-200 text-neutral-700 px-3.5 py-2 text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
+                  >
+                    <RefreshCw className="h-3.5 w-3.5" />
+                    Refresh
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1440,5 +1620,19 @@ export default function PoliciesPage() {
         )}
       </AnimatePresence>
     </div>
+  );
+}
+
+export default function PoliciesPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-64 w-full items-center justify-center">
+          <RefreshCw className="h-6 w-6 animate-spin text-blue-600" />
+        </div>
+      }
+    >
+      <PoliciesPageContent />
+    </Suspense>
   );
 }
