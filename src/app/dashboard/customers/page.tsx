@@ -933,7 +933,7 @@ export default function CustomersPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="sm:flex md:grid   grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Vehicle Plate Number *</label>
                   <input
