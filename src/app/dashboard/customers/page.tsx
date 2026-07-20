@@ -7,6 +7,8 @@ import {
   Search,
   Plus,
   Phone,
+  PhoneCall,
+  MessageCircle,
   Mail,
   MapPin,
   Car,
@@ -60,6 +62,15 @@ interface Policy {
   isActive: boolean;
 }
 
+const CUSTOMERS_PAGE_SIZE = 30;
+
+// wa.me needs the full international number with no symbols/spaces; a bare
+// 10-digit number is assumed to be a local Indian mobile missing its country code.
+const toWhatsAppNumber = (phone: string) => {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length === 10 ? `91${digits}` : digits;
+};
+
 export default function CustomersPage() {
   const { data: session } = useSession();
 
@@ -68,6 +79,7 @@ export default function CustomersPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   // Selection state
   const [selectedCustomerId, setSelectedCustomerId] = useState<string | null>(null);
@@ -78,6 +90,7 @@ export default function CustomersPage() {
 
   // Sub-tabs in Details
   const [detailTab, setDetailTab] = useState<"vehicles" | "policies" | "stats">("vehicles");
+  const [phoneMenuOpen, setPhoneMenuOpen] = useState(false);
 
   // Modals state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -113,7 +126,7 @@ export default function CustomersPage() {
     try {
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        limit: "10",
+        limit: String(CUSTOMERS_PAGE_SIZE),
         sortBy: "createdAt",
         sortOrder: "desc",
         includeInactive: "true",
@@ -127,6 +140,7 @@ export default function CustomersPage() {
       if (result.success && result.data) {
         setCustomers(result.data.customers || []);
         setTotalPages(result.data.pagination?.pages || 1);
+        setTotalRecords(result.data.pagination?.total || 0);
 
         // Auto-select first customer if none selected
         if (result.data.customers?.length > 0 && !selectedCustomerId) {
@@ -182,6 +196,7 @@ export default function CustomersPage() {
   };
 
   useEffect(() => {
+    setPhoneMenuOpen(false);
     if (selectedCustomerId) {
       fetchCustomerDetails(selectedCustomerId);
     }
@@ -509,24 +524,38 @@ export default function CustomersPage() {
             </div>
           )}
 
-          {/* Simple Pagination Footer */}
-          {totalPages > 1 && (
-            <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
-              <button
-                disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-[10px] font-bold text-neutral-400 uppercase">Page {page} of {totalPages}</span>
-              <button
-                disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50"
-              >
-                Next
-              </button>
+          {/* Pagination Footer */}
+          {totalRecords > 0 && (
+            <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span className="text-[10px] font-semibold text-neutral-400">
+                Showing{" "}
+                <strong className="text-neutral-700 font-bold">
+                  {Math.min(totalRecords, (page - 1) * CUSTOMERS_PAGE_SIZE + 1)}
+                </strong>
+                {" "}to{" "}
+                <strong className="text-neutral-700 font-bold">{Math.min(totalRecords, page * CUSTOMERS_PAGE_SIZE)}</strong>
+                {" "}of <strong className="text-neutral-700 font-bold">{totalRecords}</strong> customers
+              </span>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-2 self-end sm:self-auto">
+                  <button
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => p - 1)}
+                    className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50 cursor-pointer"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase">Page {page} of {totalPages}</span>
+                  <button
+                    disabled={page >= totalPages}
+                    onClick={() => setPage((p) => p + 1)}
+                    className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50 cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -585,9 +614,50 @@ export default function CustomersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-neutral-400 shrink-0" />
-                  <div>
+                  <div className="relative">
                     <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Primary Phone</p>
-                    <p className="font-bold text-neutral-800 mt-0.5">{selectedCustomer.phone}</p>
+                    <button
+                      type="button"
+                      onClick={() => setPhoneMenuOpen((v) => !v)}
+                      className="font-bold text-neutral-800 mt-0.5 hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-neutral-300 underline-offset-2"
+                    >
+                      {selectedCustomer.phone}
+                    </button>
+
+                    <AnimatePresence>
+                      {phoneMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-40"
+                            onClick={() => setPhoneMenuOpen(false)}
+                          />
+                          <motion.div
+                            initial={{ opacity: 0, y: -4 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -4 }}
+                            transition={{ duration: 0.1 }}
+                            className="absolute left-0 top-full z-50 mt-1 w-40 rounded-xl border border-neutral-100 bg-white shadow-lg overflow-hidden"
+                          >
+                            <a
+                              href={`tel:${selectedCustomer.phone.replace(/\s+/g, "")}`}
+                              onClick={() => setPhoneMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
+                            >
+                              <PhoneCall className="h-3.5 w-3.5 text-blue-600 shrink-0" /> Call
+                            </a>
+                            <a
+                              href={`https://wa.me/${toWhatsAppNumber(selectedCustomer.phone)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              onClick={() => setPhoneMenuOpen(false)}
+                              className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors border-t border-neutral-50"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> WhatsApp
+                            </a>
+                          </motion.div>
+                        </>
+                      )}
+                    </AnimatePresence>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
