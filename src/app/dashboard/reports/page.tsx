@@ -124,41 +124,65 @@ export default function ReportsPage() {
     setSelectedEntity(null);
   };
 
+  // Fetches every policy matching the given query params, looping through pages
+  // since /api/policies caps `limit` at 100 per request - without this, an
+  // export would silently only ever contain the first 100 matching rows.
+  const fetchAllPoliciesForExport = async (extraParams: Record<string, string>): Promise<Policy[]> => {
+    const pageSize = 100;
+    let page = 1;
+    let all: Policy[] = [];
+
+    while (true) {
+      const params = new URLSearchParams({ ...extraParams, page: String(page), limit: String(pageSize) });
+      const res = await fetch(`/api/policies?${params.toString()}`);
+      const result = await res.json();
+      if (!result.success || !result.data?.policies) {
+        throw new Error(result.message || "Could not fetch reports data.");
+      }
+
+      all = all.concat(result.data.policies);
+      const totalPages = result.data.pagination?.pages || 1;
+      if (page >= totalPages || result.data.policies.length === 0) break;
+      page += 1;
+    }
+
+    return all;
+  };
+
   // Trigger Excel download process
   const exportToExcel = async (filterType: "all" | "active" | "expired" | "expiring") => {
     setExporting(filterType);
     try {
-      // Fetch matching policies from database
-      const res = await fetch(`/api/policies?limit=100&includeInactive=true`);
-      const result = await res.json();
-      if (!result.success || !result.data?.policies) {
-        toast.error("Could not fetch reports data.");
+      // Mirrors the dashboard stat-card definitions exactly (server-side), so the
+      // export always reflects the true full dataset, not just a 100-row window.
+      const statusByFilter: Record<typeof filterType, string | undefined> = {
+        all: undefined,
+        active: "active",
+        expired: "expired",
+        expiring: "expiringSoon",
+      };
+      const status = statusByFilter[filterType];
+
+      let filtered: Policy[];
+      try {
+        filtered = await fetchAllPoliciesForExport({
+          includeInactive: "true",
+          ...(status ? { status } : {}),
+        });
+      } catch (fetchErr: any) {
+        toast.error(fetchErr.message || "Could not fetch reports data.");
         setExporting(null);
         return;
       }
 
-      const rawPolicies: Policy[] = result.data.policies;
       const now = new Date();
-      const thirtyDays = new Date();
-      thirtyDays.setDate(thirtyDays.getDate() + 30);
-
-      // Apply in-memory client-side filter
-      let filtered: Policy[] = [];
-      if (filterType === "all") {
-        filtered = rawPolicies;
-      } else if (filterType === "active") {
-        filtered = rawPolicies.filter((p) => new Date(p.expiryDate) > now && p.isActive);
-      } else if (filterType === "expired") {
-        filtered = rawPolicies.filter((p) => new Date(p.expiryDate) <= now && p.isActive);
-      } else if (filterType === "expiring") {
-        filtered = rawPolicies.filter((p) => {
-          const exp = new Date(p.expiryDate);
-          return exp > now && exp <= thirtyDays && p.isActive;
-        });
-      }
 
       if (filtered.length === 0) {
-        toast.warning("No records found matching this report filter.");
+        toast.warning("No data available", {
+          description: `There are no policies matching the "${
+            filterType === "all" ? "All Registered Policies" : filterType[0].toUpperCase() + filterType.slice(1)
+          }" report.`,
+        });
         setExporting(null);
         return;
       }

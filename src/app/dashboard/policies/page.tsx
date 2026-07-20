@@ -1123,7 +1123,7 @@ function PoliciesPageContent() {
               {/* Row 2: expiry date range, status quick-filters, and actions */}
               <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between flex-wrap">
                 <div className="flex flex-wrap items-end gap-3">
-                  <div className="space-y-1 flex flex-column">
+                  <div className="space-y-1 flex flex-col">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Expiry From</label>
                     <input
                       type="date"
@@ -1132,7 +1132,7 @@ function PoliciesPageContent() {
                       className="rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                     />
                   </div>
-                  <div className="space-y-1 flex flex-column">
+                  <div className="space-y-1 flex flex-col">
                     <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Expiry To</label>
                     <input
                       type="date"
@@ -1159,7 +1159,7 @@ function PoliciesPageContent() {
                   ))}
                 </div>
 
-                <div className="flex items-center gap-2 self-end lg:self-auto shrink-0 w-100 justify-end" >
+                <div className="flex items-center gap-2 self-end lg:self-auto shrink-0  justify-end w-full" >
                   <button
                     onClick={resetFilters}
                     disabled={!hasActiveFilters}
