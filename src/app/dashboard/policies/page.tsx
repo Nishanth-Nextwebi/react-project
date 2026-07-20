@@ -1,6 +1,6 @@
 "use client";
-
-import React, { useState, useEffect, useCallback, useRef } from "react";
+// removed required
+import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -8,7 +8,6 @@ import {
   User,
   Car,
   FileText,
-  Upload,
   CheckCircle2,
   HelpCircle,
   Clock,
@@ -103,9 +102,6 @@ export default function PoliciesPage() {
   const [extraField2, setExtraField2] = useState("");
   const [extraField3, setExtraField3] = useState("");
   const [comments, setComments] = useState("");
-  const [attachmentUrl, setAttachmentUrl] = useState("");
-  const [attachedFileName, setAttachedFileName] = useState("");
-  const [uploading, setUploading] = useState(false);
 
   // Form Submission/Processing
   const [saving, setSaving] = useState(false);
@@ -127,10 +123,6 @@ export default function PoliciesPage() {
   // Deactivate Policy modal
   const [policyToDeactivate, setPolicyToDeactivate] = useState<Policy | null>(null);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
-
-  // Drag and Drop State
-  const [dragActive, setDragActive] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 1. Load policies list
   const fetchPolicies = useCallback(async () => {
@@ -260,67 +252,16 @@ export default function PoliciesPage() {
     lookupVehicle(chassisNumber);
   };
 
-  // 4. File Drag and Drop Handling
-  const handleDrag = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      processFile(e.dataTransfer.files[0]);
-    }
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      processFile(e.target.files[0]);
-    }
-  };
-
-  const processFile = (file: File) => {
-    setUploading(true);
-    setAttachedFileName(file.name);
-    // Simulate high speed upload
-    setTimeout(() => {
-      setAttachmentUrl(`/uploads/${Date.now()}_${encodeURIComponent(file.name)}`);
-      setUploading(false);
-      toast.success(`Attached file: ${file.name}`);
-    }, 800);
-  };
-
-  const triggerFileInput = () => {
-    fileInputRef.current?.click();
-  };
-
-  const clearAttachment = () => {
-    setAttachmentUrl("");
-    setAttachedFileName("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-    toast.info("Attachment removed.");
-  };
-
   // 5. Save Insurance (Smart Save)
   const handleSaveInsurance = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!phone || !custName) {
-      toast.error("Please fill in the Customer Information.");
+      toast.error("Phone Number and Full Name are required.");
       return;
     }
-    if (!vehicleNumber || !manufacturer || !model || !engineNumber || !chassisNumber) {
-      toast.error("Please complete the Vehicle specifications.");
+    if (!vehicleNumber) {
+      toast.error("Vehicle Number is required.");
       return;
     }
     if (!policyNumber || !insuranceCompany || !policyType || !premiumAmount || !startDate || !expiryDate) {
@@ -358,7 +299,6 @@ export default function PoliciesPage() {
           extraField2,
           extraField3,
           comments,
-          attachmentUrl,
         },
       };
 
@@ -413,8 +353,6 @@ export default function PoliciesPage() {
     setExtraField2("");
     setExtraField3("");
     setComments("");
-    setAttachmentUrl("");
-    setAttachedFileName("");
   };
 
   // 6. Renewal copying
@@ -442,12 +380,10 @@ export default function PoliciesPage() {
     setPolicyType(policy.policyType);
     setPremiumAmount(policy.premiumAmount.toString());
     
-    // Clear the policy number, dates and attachments for fresh entry
+    // Clear the policy number and dates for fresh entry
     setPolicyNumber("");
     setStartDate("");
     setExpiryDate("");
-    setAttachmentUrl("");
-    setAttachedFileName("");
     setComments(`Renewal of Policy #${policy.policyNumber}`);
     setExtraField1(policy.extraField1 || "");
     setExtraField2(policy.extraField2 || "");
@@ -654,10 +590,9 @@ export default function PoliciesPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Chassis Number *</label>
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Chassis Number (Optional)</label>
                     <input
                       type="text"
-                      required
                       placeholder="e.g. 17-digit frame number"
                       value={chassisNumber}
                       onChange={(e) => setChassisNumber(e.target.value.toUpperCase())}
@@ -667,10 +602,9 @@ export default function PoliciesPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Engine Number *</label>
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Engine Number (Optional)</label>
                     <input
                       type="text"
-                      required
                       placeholder="e.g. ENG99988877"
                       value={engineNumber}
                       onChange={(e) => setEngineNumber(e.target.value.toUpperCase())}
@@ -693,10 +627,9 @@ export default function PoliciesPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Manufacturer *</label>
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Manufacturer (Optional)</label>
                     <input
                       type="text"
-                      required
                       placeholder="e.g. Honda, Suzuki"
                       value={manufacturer}
                       onChange={(e) => setManufacturer(e.target.value)}
@@ -705,10 +638,9 @@ export default function PoliciesPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Model *</label>
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Model (Optional)</label>
                     <input
                       type="text"
-                      required
                       placeholder="e.g. Activa, City"
                       value={model}
                       onChange={(e) => setModel(e.target.value)}
@@ -717,10 +649,9 @@ export default function PoliciesPage() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Year *</label>
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Year (Optional)</label>
                     <input
                       type="number"
-                      required
                       min={1900}
                       max={new Date().getFullYear() + 1}
                       value={year}
@@ -743,7 +674,7 @@ export default function PoliciesPage() {
               </div>
             </div>
 
-            {/* Right Panel (Section 3: Policy parameters and Attachments) */}
+            {/* Right Panel (Section 3: Policy parameters) */}
             <div className="space-y-6">
               {/* Section 3: Policy Information */}
               <div id="section_policy_info" className="bg-white rounded-2xl border border-neutral-100 p-6 shadow-sm space-y-4">
@@ -865,67 +796,6 @@ export default function PoliciesPage() {
                       onChange={(e) => setComments(e.target.value)}
                       className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
                     />
-                  </div>
-
-                  {/* Attachment upload */}
-                  <div className="space-y-2">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Attachment</label>
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileChange}
-                      className="hidden"
-                      accept=".pdf,.doc,.docx,.jpg,.png"
-                    />
-
-                    {attachmentUrl ? (
-                      /* Active attachment widget */
-                      <div className="flex items-center justify-between rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
-                        <div className="flex items-center gap-2 overflow-hidden">
-                          <Paperclip className="h-4 w-4 text-emerald-600 shrink-0" />
-                          <div className="flex flex-col overflow-hidden">
-                            <span className="text-xs font-semibold text-emerald-900 truncate">
-                              {attachedFileName || "Policy_Document.pdf"}
-                            </span>
-                            <span className="text-[9px] text-emerald-600">Document Upload Complete (100%)</span>
-                          </div>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={clearAttachment}
-                          className="rounded-lg p-1 text-emerald-700 hover:bg-emerald-100/60 cursor-pointer"
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      /* Drag & drop target */
-                      <div
-                        onDragEnter={handleDrag}
-                        onDragOver={handleDrag}
-                        onDragLeave={handleDrag}
-                        onDrop={handleDrop}
-                        onClick={triggerFileInput}
-                        className={`border border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${
-                          dragActive
-                            ? "border-blue-500 bg-blue-50/20"
-                            : "border-neutral-200 hover:border-blue-400 hover:bg-neutral-50/40"
-                        }`}
-                      >
-                        <Upload className="mx-auto h-5 w-5 text-neutral-400 mb-2" />
-                        {uploading ? (
-                          <div className="text-xs text-neutral-500 flex items-center justify-center gap-1.5 animate-pulse">
-                            <RefreshCw className="h-3 w-3 animate-spin text-blue-600" />
-                            Uploading file...
-                          </div>
-                        ) : (
-                          <>
-                            <p className="text-xs font-bold text-neutral-700">Drag & Drop policy document</p>
-                            <p className="text-[10px] text-neutral-400 mt-0.5">or click to browse local files</p>
-                          </>
-                        )}
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
