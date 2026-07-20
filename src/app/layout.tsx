@@ -1,5 +1,6 @@
 import "@/index.css";
 import { Inter } from "next/font/google";
+import { Toaster } from "sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -20,6 +21,7 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} antialiased`}>
       <body className="min-h-screen bg-neutral-50/50 text-neutral-900 font-sans antialiased">
         {children}
+        <Toaster richColors position="top-right" />
       </body>
     </html>
   );

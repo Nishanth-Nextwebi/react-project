@@ -7,8 +7,6 @@ import {
   Search,
   Plus,
   Phone,
-  PhoneCall,
-  MessageCircle,
   Mail,
   MapPin,
   Car,
@@ -27,6 +25,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import PhoneActions from "@/components/PhoneActions";
 
 interface Customer {
   _id: string;
@@ -62,14 +61,7 @@ interface Policy {
   isActive: boolean;
 }
 
-const CUSTOMERS_PAGE_SIZE = 30;
-
-// wa.me needs the full international number with no symbols/spaces; a bare
-// 10-digit number is assumed to be a local Indian mobile missing its country code.
-const toWhatsAppNumber = (phone: string) => {
-  const digits = phone.replace(/\D/g, "");
-  return digits.length === 10 ? `91${digits}` : digits;
-};
+const CUSTOMERS_PAGE_SIZE = 10;
 
 // Surfaces the API's specific validation/error detail (e.g. "vehicleType: Please
 // select a valid vehicle classification"), not just the generic top-level message,
@@ -99,7 +91,6 @@ export default function CustomersPage() {
 
   // Sub-tabs in Details
   const [detailTab, setDetailTab] = useState<"vehicles" | "policies" | "stats">("vehicles");
-  const [phoneMenuOpen, setPhoneMenuOpen] = useState(false);
 
   // Modals state
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
@@ -204,7 +195,6 @@ export default function CustomersPage() {
   };
 
   useEffect(() => {
-    setPhoneMenuOpen(false);
     if (selectedCustomerId) {
       fetchCustomerDetails(selectedCustomerId);
     }
@@ -608,50 +598,13 @@ export default function CustomersPage() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-neutral-400 shrink-0" />
-                  <div className="relative">
+                  <div>
                     <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Primary Phone</p>
-                    <button
-                      type="button"
-                      onClick={() => setPhoneMenuOpen((v) => !v)}
-                      className="font-bold text-neutral-800 mt-0.5 hover:text-blue-600 transition-colors cursor-pointer underline decoration-dotted decoration-neutral-300 underline-offset-2"
-                    >
-                      {selectedCustomer.phone}
-                    </button>
-
-                    <AnimatePresence>
-                      {phoneMenuOpen && (
-                        <>
-                          <div
-                            className="fixed inset-0 z-40"
-                            onClick={() => setPhoneMenuOpen(false)}
-                          />
-                          <motion.div
-                            initial={{ opacity: 0, y: -4 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -4 }}
-                            transition={{ duration: 0.1 }}
-                            className="absolute left-0 top-full z-50 mt-1 w-40 rounded-xl border border-neutral-100 bg-white shadow-lg overflow-hidden"
-                          >
-                            <a
-                              href={`tel:${selectedCustomer.phone.replace(/\s+/g, "")}`}
-                              onClick={() => setPhoneMenuOpen(false)}
-                              className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
-                            >
-                              <PhoneCall className="h-3.5 w-3.5 text-blue-600 shrink-0" /> Call
-                            </a>
-                            <a
-                              href={`https://wa.me/${toWhatsAppNumber(selectedCustomer.phone)}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              onClick={() => setPhoneMenuOpen(false)}
-                              className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors border-t border-neutral-50"
-                            >
-                              <MessageCircle className="h-3.5 w-3.5 text-emerald-600 shrink-0" /> WhatsApp
-                            </a>
-                          </motion.div>
-                        </>
-                      )}
-                    </AnimatePresence>
+                    <PhoneActions
+                      key={selectedCustomer._id}
+                      phone={selectedCustomer.phone}
+                      className="font-bold text-neutral-800 mt-0.5"
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

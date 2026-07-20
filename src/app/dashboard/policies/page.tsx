@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import PhoneActions from "@/components/PhoneActions";
 
 interface Customer {
   _id: string;
@@ -1248,7 +1249,9 @@ function PoliciesPageContent() {
                               </td>
                               <td className="py-4 px-6 font-semibold text-neutral-800">
                                 {pol.customer?.name || "N/A"}
-                                <div className="text-[10px] text-neutral-400 font-normal mt-0.5">{pol.customer?.phone}</div>
+                                <div className="mt-0.5">
+                                  <PhoneActions phone={pol.customer?.phone} className="text-[10px] text-neutral-400 font-normal" />
+                                </div>
                               </td>
                               <td className="py-4 px-6">
                                 <div className="flex flex-col">
@@ -1410,7 +1413,7 @@ function PoliciesPageContent() {
                     </div>
                     <div className="flex justify-between text-xs">
                       <span className="text-neutral-400">Phone</span>
-                      <strong className="text-neutral-800 font-mono">{selectedPolicy.customer?.phone}</strong>
+                      <PhoneActions phone={selectedPolicy.customer?.phone} className="text-neutral-800 font-mono font-bold" menuAlign="right" />
                     </div>
                     {selectedPolicy.customer?.email && (
                       <div className="flex justify-between text-xs">
