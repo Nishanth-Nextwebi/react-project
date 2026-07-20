@@ -4,6 +4,8 @@ import { VehicleRepository } from "@/repositories/VehicleRepository";
 import type { PolicyInput } from "@/lib/validations";
 import type { Prisma } from "@/generated/prisma/client";
 
+export type PolicyStatusFilter = "active" | "expired" | "expiringSoon" | "today" | "newThisMonth";
+
 export interface PolicyPaginationParams {
   page: number;
   limit: number;
@@ -13,6 +15,18 @@ export interface PolicyPaginationParams {
   includeInactive?: boolean;
   customerId?: string;
   vehicleId?: string;
+  /** Distinct listing-page filters (all AND-combined) - separate from `search`, which
+   * remains a single-box OR search used only by the Reports page autocomplete. */
+  customerName?: string;
+  policyNumber?: string;
+  phone?: string;
+  vehicleNumber?: string;
+  insuranceCompany?: string;
+  expiryFrom?: string;
+  expiryTo?: string;
+  /** Mirrors the dashboard stat-card definitions exactly (DashboardService.getDashboardData),
+   * so clicking a card and filtering by the equivalent status here return the same count. */
+  status?: PolicyStatusFilter;
 }
 
 export class PolicyService {
@@ -34,7 +48,24 @@ export class PolicyService {
    * Fetch paginated, sorted, and filtered policies
    */
   async listPolicies(params: PolicyPaginationParams) {
-    const { page, limit, search, sortBy, sortOrder, includeInactive = false, customerId, vehicleId } = params;
+    const {
+      page,
+      limit,
+      search,
+      sortBy,
+      sortOrder,
+      includeInactive = false,
+      customerId,
+      vehicleId,
+      customerName,
+      policyNumber,
+      phone,
+      vehicleNumber,
+      insuranceCompany,
+      expiryFrom,
+      expiryTo,
+      status,
+    } = params;
     const skip = (page - 1) * limit;
 
     const where: Prisma.PolicyWhereInput = {};
@@ -52,11 +83,62 @@ export class PolicyService {
 
     if (search) {
       // Case-insensitive search on Policy Number, Insurance Company, or Policy Type
+      // Only used by the Reports page's single-box autocomplete lookup.
       where.OR = [
         { policyNumber: { contains: search } },
         { insuranceCompany: { contains: search } },
         { policyType: { contains: search } },
       ];
+    }
+
+    if (policyNumber) {
+      where.policyNumber = { contains: policyNumber };
+    }
+
+    if (insuranceCompany) {
+      where.insuranceCompany = { contains: insuranceCompany };
+    }
+
+    if (customerName || phone) {
+      where.customer = {
+        ...(customerName ? { name: { contains: customerName } } : {}),
+        ...(phone ? { phone: { contains: phone } } : {}),
+      };
+    }
+
+    if (vehicleNumber) {
+      where.vehicle = { vehicleNumber: { contains: vehicleNumber } };
+    }
+
+    // `status` mirrors a dashboard stat card exactly and takes precedence over a
+    // manually-entered expiry date range, since the two are meant as alternatives
+    // (deep-linking from the dashboard vs. filtering by hand).
+    if (status) {
+      where.isActive = true;
+      const now = new Date();
+      if (status === "active") {
+        where.expiryDate = { gt: now };
+      } else if (status === "expired") {
+        where.expiryDate = { lte: now };
+      } else if (status === "expiringSoon") {
+        const thirtyDaysLater = new Date();
+        thirtyDaysLater.setDate(thirtyDaysLater.getDate() + 30);
+        where.expiryDate = { gt: now, lte: thirtyDaysLater };
+      } else if (status === "today") {
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date();
+        todayEnd.setHours(23, 59, 59, 999);
+        where.expiryDate = { gte: todayStart, lte: todayEnd };
+      } else if (status === "newThisMonth") {
+        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+        where.createdAt = { gte: monthStart };
+      }
+    } else if (expiryFrom || expiryTo) {
+      where.expiryDate = {
+        ...(expiryFrom ? { gte: new Date(expiryFrom) } : {}),
+        ...(expiryTo ? { lte: new Date(`${expiryTo}T23:59:59.999`) } : {}),
+      };
     }
 
     const orderBy: Prisma.PolicyOrderByWithRelationInput = { [sortBy]: sortOrder };

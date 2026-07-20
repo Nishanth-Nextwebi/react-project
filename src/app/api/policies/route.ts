@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/auth";
-import { PolicyService } from "@/services/policyService";
+import { PolicyService, type PolicyStatusFilter } from "@/services/policyService";
 import { policySchema } from "@/lib/validations";
 import { serializePolicy } from "./_serialize";
 
@@ -30,6 +30,14 @@ export async function GET(req: NextRequest) {
     const includeInactive = searchParams.get("includeInactive") === "true";
     const customerId = searchParams.get("customerId") || undefined;
     const vehicleId = searchParams.get("vehicleId") || undefined;
+    const customerName = searchParams.get("customerName") || undefined;
+    const policyNumber = searchParams.get("policyNumber") || undefined;
+    const phone = searchParams.get("phone") || undefined;
+    const vehicleNumber = searchParams.get("vehicleNumber") || undefined;
+    const insuranceCompany = searchParams.get("insuranceCompany") || undefined;
+    const expiryFrom = searchParams.get("expiryFrom") || undefined;
+    const expiryTo = searchParams.get("expiryTo") || undefined;
+    const status = (searchParams.get("status") as PolicyStatusFilter | null) || undefined;
 
     const data = await policyService.listPolicies({
       page,
@@ -40,6 +48,14 @@ export async function GET(req: NextRequest) {
       includeInactive,
       customerId,
       vehicleId,
+      customerName,
+      policyNumber,
+      phone,
+      vehicleNumber,
+      insuranceCompany,
+      expiryFrom,
+      expiryTo,
+      status,
     });
 
     return NextResponse.json({

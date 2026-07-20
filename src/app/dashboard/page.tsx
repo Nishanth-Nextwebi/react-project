@@ -232,7 +232,11 @@ export default function DashboardPage() {
             </div>
 
             {/* CARD 2: Active Policies */}
-            <div id="stat_active_policies" className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between">
+            <Link
+              href="/dashboard/policies?tab=list&status=active"
+              id="stat_active_policies"
+              className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-emerald-200 hover:shadow-sm"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Active Cover</span>
                 <span className="p-1.5 bg-emerald-50 rounded-lg text-emerald-500"><ShieldCheck className="h-3.5 w-3.5" /></span>
@@ -241,10 +245,14 @@ export default function DashboardPage() {
                 <h3 className="text-2xl font-extrabold text-emerald-600">{stats?.activePolicies}</h3>
                 <p className="text-[10px] text-emerald-500 mt-1 font-semibold">In force policy contracts</p>
               </div>
-            </div>
+            </Link>
 
             {/* CARD 3: Expired Policies */}
-            <div id="stat_expired_policies" className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between">
+            <Link
+              href="/dashboard/policies?tab=list&status=expired"
+              id="stat_expired_policies"
+              className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-rose-200 hover:shadow-sm"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Expired Cover</span>
                 <span className="p-1.5 bg-rose-50 rounded-lg text-rose-500"><ShieldAlert className="h-3.5 w-3.5" /></span>
@@ -253,10 +261,14 @@ export default function DashboardPage() {
                 <h3 className="text-2xl font-extrabold text-rose-600">{stats?.expiredPolicies}</h3>
                 <p className="text-[10px] text-neutral-400 mt-1">Requires renewal touchpoint</p>
               </div>
-            </div>
+            </Link>
 
             {/* CARD 4: Expiring Soon */}
-            <div id="stat_expiring_soon" className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between">
+            <Link
+              href="/dashboard/policies?tab=list&status=expiringSoon"
+              id="stat_expiring_soon"
+              className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-amber-200 hover:shadow-sm"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Expiring 30d</span>
                 <span className="p-1.5 bg-amber-50 rounded-lg text-amber-500"><Clock className="h-3.5 w-3.5" /></span>
@@ -265,10 +277,14 @@ export default function DashboardPage() {
                 <h3 className="text-2xl font-extrabold text-amber-600">{stats?.expiringSoon}</h3>
                 <p className="text-[10px] text-amber-500 mt-1 font-semibold">Immediate pipeline danger</p>
               </div>
-            </div>
+            </Link>
 
             {/* CARD 5: Today's Renewals */}
-            <div id="stat_todays_renewals" className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between">
+            <Link
+              href="/dashboard/policies?tab=list&status=today"
+              id="stat_todays_renewals"
+              className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-blue-200 hover:shadow-sm"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Today's Expiry</span>
                 <span className="p-1.5 bg-blue-50 rounded-lg text-blue-500"><Calendar className="h-3.5 w-3.5" /></span>
@@ -277,10 +293,14 @@ export default function DashboardPage() {
                 <h3 className="text-2xl font-extrabold text-blue-600">{stats?.todaysRenewals}</h3>
                 <p className="text-[10px] text-neutral-400 mt-1">Expiring within 24 hours</p>
               </div>
-            </div>
+            </Link>
 
             {/* CARD 6: Monthly Addition */}
-            <div id="stat_monthly_additions" className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between">
+            <Link
+              href="/dashboard/policies?tab=list&status=newThisMonth"
+              id="stat_monthly_additions"
+              className="bg-white rounded-2xl border border-neutral-100 p-5 shadow-xs flex flex-col justify-between cursor-pointer transition-all hover:border-purple-200 hover:shadow-sm"
+            >
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">New This Month</span>
                 <span className="p-1.5 bg-purple-50 rounded-lg text-purple-500"><TrendingUp className="h-3.5 w-3.5" /></span>
@@ -289,7 +309,7 @@ export default function DashboardPage() {
                 <h3 className="text-2xl font-extrabold text-purple-600">{stats?.newThisMonth}</h3>
                 <p className="text-[10px] text-neutral-400 mt-1">Onboarded this calendar month</p>
               </div>
-            </div>
+            </Link>
 
           </div>
 
