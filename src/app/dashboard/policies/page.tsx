@@ -1,5 +1,5 @@
 "use client";
-
+// removed required
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
