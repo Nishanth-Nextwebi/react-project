@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import PhoneActions from "@/components/PhoneActions";
 
 interface Customer {
   _id: string;
@@ -59,6 +60,18 @@ interface Policy {
   expiryDate: string;
   isActive: boolean;
 }
+
+const CUSTOMERS_PAGE_SIZE = 10;
+
+// Surfaces the API's specific validation/error detail (e.g. "vehicleType: Please
+// select a valid vehicle classification"), not just the generic top-level message,
+// so the user can actually tell what went wrong.
+const showApiError = (result: any, fallbackMessage: string) => {
+  const errors: string[] = Array.isArray(result?.errors) ? result.errors : [];
+  toast.error(result?.message || fallbackMessage, {
+    description: errors.length > 0 ? errors.join(" ") : undefined,
+  });
+};
 
 export default function CustomersPage() {
   const { data: session } = useSession();
@@ -97,7 +110,7 @@ export default function CustomersPage() {
 
   // Form Fields - Vehicle
   const [vehPlate, setVehPlate] = useState("");
-  const [vehType, setVehType] = useState("Four Wheeler");
+  const [vehType, setVehType] = useState("Four-Wheeler");
   const [vehMake, setVehMake] = useState("");
   const [vehModel, setVehModel] = useState("");
   const [vehYear, setVehYear] = useState(new Date().getFullYear());
@@ -113,7 +126,7 @@ export default function CustomersPage() {
     try {
       const queryParams = new URLSearchParams({
         page: page.toString(),
-        limit: "10",
+        limit: String(CUSTOMERS_PAGE_SIZE),
         sortBy: "createdAt",
         sortOrder: "desc",
         includeInactive: "true",
@@ -252,7 +265,7 @@ export default function CustomersPage() {
           fetchCustomerDetails(selectedCustomerId);
         }
       } else {
-        toast.error(result.message || "Operation failed.");
+        showApiError(result, "Operation failed.");
       }
     } catch (error) {
       console.error(error);
@@ -278,7 +291,7 @@ export default function CustomersPage() {
         setSelectedCustomer(null);
         fetchCustomers();
       } else {
-        toast.error(result.message || "Failed to delete customer.");
+        showApiError(result, "Failed to delete customer.");
       }
     } catch (error) {
       console.error(error);
@@ -292,7 +305,7 @@ export default function CustomersPage() {
   const openAddVehicle = () => {
     setVehicleModalMode("add");
     setVehPlate("");
-    setVehType("Four Wheeler");
+    setVehType("Four-Wheeler");
     setVehMake("");
     setVehModel("");
     setVehYear(new Date().getFullYear());
@@ -307,7 +320,7 @@ export default function CustomersPage() {
     setVehicleModalMode("edit");
     setSelectedVehicle(veh);
     setVehPlate(veh.vehicleNumber);
-    setVehType(veh.vehicleType || "Four Wheeler");
+    setVehType(veh.vehicleType || "Four-Wheeler");
     setVehMake(veh.manufacturer);
     setVehModel(veh.model);
     setVehYear(veh.year);
@@ -363,7 +376,7 @@ export default function CustomersPage() {
         setIsVehicleModalOpen(false);
         fetchCustomerDetails(selectedCustomerId);
       } else {
-        toast.error(result.message || "Vehicle action failed.");
+        showApiError(result, "Vehicle action failed.");
       }
     } catch (error) {
       console.error(error);
@@ -388,7 +401,7 @@ export default function CustomersPage() {
         setSelectedVehicle(null);
         fetchCustomerDetails(selectedCustomerId);
       } else {
-        toast.error(result.message || "Failed to deactivate vehicle.");
+        showApiError(result, "Failed to deactivate vehicle.");
       }
     } catch (error) {
       console.error(error);
@@ -509,21 +522,21 @@ export default function CustomersPage() {
             </div>
           )}
 
-          {/* Simple Pagination Footer */}
+          {/* Pagination Footer */}
           {totalPages > 1 && (
             <div className="p-4 bg-neutral-50 border-t border-neutral-100 flex items-center justify-between">
               <button
                 disabled={page <= 1}
-                onClick={() => setPage(p => p - 1)}
-                className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50"
+                onClick={() => setPage((p) => p - 1)}
+                className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50 cursor-pointer"
               >
                 Previous
               </button>
               <span className="text-[10px] font-bold text-neutral-400 uppercase">Page {page} of {totalPages}</span>
               <button
                 disabled={page >= totalPages}
-                onClick={() => setPage(p => p + 1)}
-                className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50"
+                onClick={() => setPage((p) => p + 1)}
+                className="px-3 py-1 bg-white border border-neutral-200 rounded-lg text-[11px] font-bold text-neutral-600 disabled:opacity-50 cursor-pointer"
               >
                 Next
               </button>
@@ -587,7 +600,11 @@ export default function CustomersPage() {
                   <Phone className="h-4 w-4 text-neutral-400 shrink-0" />
                   <div>
                     <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Primary Phone</p>
-                    <p className="font-bold text-neutral-800 mt-0.5">{selectedCustomer.phone}</p>
+                    <PhoneActions
+                      key={selectedCustomer._id}
+                      phone={selectedCustomer.phone}
+                      className="font-bold text-neutral-800 mt-0.5"
+                    />
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -824,7 +841,7 @@ export default function CustomersPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-md w-full shadow-xl space-y-4"
+              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl space-y-4"
             >
               <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
                 <h3 className="text-sm font-bold text-neutral-800">
@@ -905,7 +922,7 @@ export default function CustomersPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-md w-full shadow-xl space-y-4"
+              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-md w-full max-h-[90vh] overflow-y-auto shadow-xl space-y-4"
             >
               <div className="flex items-center justify-between border-b border-neutral-100 pb-3">
                 <h3 className="text-sm font-bold text-neutral-800">
@@ -916,7 +933,7 @@ export default function CustomersPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto p-1">
+              <div className="sm:flex md:grid   grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Vehicle Plate Number *</label>
                   <input
@@ -936,9 +953,10 @@ export default function CustomersPage() {
                     onChange={(e) => setVehType(e.target.value)}
                     className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold focus:outline-none bg-white"
                   >
-                    <option value="Four Wheeler">Four Wheeler</option>
-                    <option value="Two Wheeler">Two Wheeler</option>
+                    <option value="Four-Wheeler">Four-Wheeler</option>
+                    <option value="Two-Wheeler">Two-Wheeler</option>
                     <option value="Commercial">Commercial</option>
+                    <option value="Other">Other</option>
                   </select>
                 </div>
 
@@ -1031,7 +1049,7 @@ export default function CustomersPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-sm w-full shadow-xl space-y-4 text-center"
+              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-sm w-full max-h-[90vh] overflow-y-auto shadow-xl space-y-4 text-center"
             >
               <div className="mx-auto h-12 w-12 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center justify-center">
                 <AlertTriangle className="h-6 w-6" />
@@ -1068,7 +1086,7 @@ export default function CustomersPage() {
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-sm w-full shadow-xl space-y-4 text-center"
+              className="bg-white rounded-2xl p-6 border border-neutral-100 max-w-sm w-full max-h-[90vh] overflow-y-auto shadow-xl space-y-4 text-center"
             >
               <div className="mx-auto h-12 w-12 bg-rose-50 border border-rose-100 text-rose-600 rounded-2xl flex items-center justify-center">
                 <AlertTriangle className="h-6 w-6" />

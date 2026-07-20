@@ -59,7 +59,7 @@ export class DashboardService {
     }));
 
     // 3. Compute Charts - Insurance Company Distribution
-    const companyDistributionAgg = await this.policyRepository.groupActiveByCompany(6);
+    const companyDistributionAgg = await this.policyRepository.groupActiveByCompany(50);
 
     const companyDistribution = companyDistributionAgg.map((item) => ({
       name: item.name,

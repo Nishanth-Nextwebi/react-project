@@ -21,6 +21,8 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { toast } from "sonner";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 interface Customer {
   _id: string;
@@ -122,41 +124,65 @@ export default function ReportsPage() {
     setSelectedEntity(null);
   };
 
+  // Fetches every policy matching the given query params, looping through pages
+  // since /api/policies caps `limit` at 100 per request - without this, an
+  // export would silently only ever contain the first 100 matching rows.
+  const fetchAllPoliciesForExport = async (extraParams: Record<string, string>): Promise<Policy[]> => {
+    const pageSize = 100;
+    let page = 1;
+    let all: Policy[] = [];
+
+    while (true) {
+      const params = new URLSearchParams({ ...extraParams, page: String(page), limit: String(pageSize) });
+      const res = await fetch(`/api/policies?${params.toString()}`);
+      const result = await res.json();
+      if (!result.success || !result.data?.policies) {
+        throw new Error(result.message || "Could not fetch reports data.");
+      }
+
+      all = all.concat(result.data.policies);
+      const totalPages = result.data.pagination?.pages || 1;
+      if (page >= totalPages || result.data.policies.length === 0) break;
+      page += 1;
+    }
+
+    return all;
+  };
+
   // Trigger Excel download process
   const exportToExcel = async (filterType: "all" | "active" | "expired" | "expiring") => {
     setExporting(filterType);
     try {
-      // Fetch matching policies from database
-      const res = await fetch(`/api/policies?limit=100&includeInactive=true`);
-      const result = await res.json();
-      if (!result.success || !result.data?.policies) {
-        toast.error("Could not fetch reports data.");
+      // Mirrors the dashboard stat-card definitions exactly (server-side), so the
+      // export always reflects the true full dataset, not just a 100-row window.
+      const statusByFilter: Record<typeof filterType, string | undefined> = {
+        all: undefined,
+        active: "active",
+        expired: "expired",
+        expiring: "expiringSoon",
+      };
+      const status = statusByFilter[filterType];
+
+      let filtered: Policy[];
+      try {
+        filtered = await fetchAllPoliciesForExport({
+          includeInactive: "true",
+          ...(status ? { status } : {}),
+        });
+      } catch (fetchErr: any) {
+        toast.error(fetchErr.message || "Could not fetch reports data.");
         setExporting(null);
         return;
       }
 
-      const rawPolicies: Policy[] = result.data.policies;
       const now = new Date();
-      const thirtyDays = new Date();
-      thirtyDays.setDate(thirtyDays.getDate() + 30);
-
-      // Apply in-memory client-side filter
-      let filtered: Policy[] = [];
-      if (filterType === "all") {
-        filtered = rawPolicies;
-      } else if (filterType === "active") {
-        filtered = rawPolicies.filter((p) => new Date(p.expiryDate) > now && p.isActive);
-      } else if (filterType === "expired") {
-        filtered = rawPolicies.filter((p) => new Date(p.expiryDate) <= now && p.isActive);
-      } else if (filterType === "expiring") {
-        filtered = rawPolicies.filter((p) => {
-          const exp = new Date(p.expiryDate);
-          return exp > now && exp <= thirtyDays && p.isActive;
-        });
-      }
 
       if (filtered.length === 0) {
-        toast.warning("No records found matching this report filter.");
+        toast.warning("No data available", {
+          description: `There are no policies matching the "${
+            filterType === "all" ? "All Registered Policies" : filterType[0].toUpperCase() + filterType.slice(1)
+          }" report.`,
+        });
         setExporting(null);
         return;
       }
@@ -318,8 +344,210 @@ export default function ReportsPage() {
     }
   };
 
-  const triggerPrint = () => {
-    window.print();
+  // Builds an actual PDF document (not a screenshot of the page) using jsPDF,
+  // so only the statement content ends up in the file - never the sidebar,
+  // header, or on-screen controls.
+  const downloadPdfReport = () => {
+    if (!reportDetails) return;
+
+    const INK: [number, number, number] = [23, 23, 23];
+    const MUTED: [number, number, number] = [115, 115, 115];
+    const LIGHT_BG: [number, number, number] = [248, 250, 252];
+    const BORDER: [number, number, number] = [225, 225, 225];
+
+    const doc = new jsPDF({ unit: "pt", format: "a4" });
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const marginX = 48;
+    const contentWidth = pageWidth - marginX * 2;
+    const now = new Date();
+    let y = 56;
+
+    // --- Letterhead ---
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.setTextColor(...INK);
+    doc.text("PolicyFlow Ltd.", marginX, y);
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...MUTED);
+    doc.text("STANDARD OPERATIONS LEDGER", marginX, y + 16);
+    doc.setFont("helvetica", "normal");
+    doc.text("Authorized Broker Certificate & Database Statement", marginX, y + 29);
+
+    const refNo = `PF-LE-${Date.now().toString().slice(6)}`;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...INK);
+    doc.text(`DATE: ${now.toLocaleDateString("en-IN")}`, pageWidth - marginX, y - 6, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...MUTED);
+    doc.text(`REF NO: ${refNo}`, pageWidth - marginX, y + 7, { align: "right" });
+    doc.text("OPERATOR ID: SYSTEM", pageWidth - marginX, y + 20, { align: "right" });
+
+    y += 44;
+    doc.setDrawColor(...INK);
+    doc.setLineWidth(1.4);
+    doc.line(marginX, y, pageWidth - marginX, y);
+    y += 28;
+
+    // --- Subject ---
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(...MUTED);
+    doc.text(`SUBJECT CLASSIFICATION: ${reportDetails.type.toUpperCase()}`, marginX, y);
+    y += 20;
+    doc.setFontSize(16);
+    doc.setTextColor(...INK);
+    doc.text(String(reportDetails.subjectName || ""), marginX, y);
+    y += 18;
+
+    // --- Metadata card (2-column label/value grid) ---
+    const metaEntries = Object.entries(reportDetails.metadata || {});
+    if (metaEntries.length > 0) {
+      const colGap = 24;
+      const colWidth = (contentWidth - colGap) / 2;
+      const rowHeight = 34;
+      const rows = Math.ceil(metaEntries.length / 2);
+      const boxHeight = rows * rowHeight + 20;
+
+      doc.setFillColor(...LIGHT_BG);
+      doc.setDrawColor(...BORDER);
+      doc.roundedRect(marginX, y, contentWidth, boxHeight, 6, 6, "FD");
+
+      metaEntries.forEach(([label, value], idx) => {
+        const col = idx % 2;
+        const row = Math.floor(idx / 2);
+        const cellX = marginX + 16 + col * (colWidth + colGap);
+        const cellY = y + 20 + row * rowHeight;
+
+        doc.setFontSize(7.5);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...MUTED);
+        doc.text(String(label).toUpperCase(), cellX, cellY);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(...INK);
+        doc.text(doc.splitTextToSize(String(value ?? ""), colWidth - 16), cellX, cellY + 13);
+      });
+
+      y += boxHeight + 26;
+    }
+
+    // --- Additional (policy template): owner linkages + comments ---
+    if (reportDetails.additional) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text("ASSET OWNER LINKAGES", marginX, y);
+      y += 16;
+
+      const half = contentWidth / 2;
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...MUTED);
+      doc.text("LINKED CUSTOMER", marginX, y);
+      doc.text("MAPPED VEHICLE", marginX + half, y);
+      y += 13;
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text(String(reportDetails.additional.customerName || "N/A"), marginX, y);
+      doc.text(String(reportDetails.additional.vehiclePlate || "N/A"), marginX + half, y);
+      y += 13;
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
+      doc.setTextColor(...MUTED);
+      doc.text(String(reportDetails.additional.customerPhone || ""), marginX, y);
+      doc.text(String(reportDetails.additional.vehicleModel || ""), marginX + half, y);
+      y += 24;
+
+      doc.setDrawColor(...BORDER);
+      doc.line(marginX, y, pageWidth - marginX, y);
+      y += 18;
+
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...MUTED);
+      doc.text("COMMENTS", marginX, y);
+      y += 14;
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(9.5);
+      doc.setTextColor(60, 60, 60);
+      const commentLines = doc.splitTextToSize(String(reportDetails.additional.comments || ""), contentWidth);
+      doc.text(commentLines, marginX, y);
+      y += commentLines.length * 12 + 20;
+    }
+
+    // --- Linked Policy Register table ---
+    if (reportDetails.items) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text("LINKED POLICY REGISTER", marginX, y);
+
+      if (reportDetails.items.length === 0) {
+        doc.setFont("helvetica", "italic");
+        doc.setFontSize(9);
+        doc.setTextColor(...MUTED);
+        doc.text("No historical insurance records found matching this ledger.", marginX, y + 16);
+      } else {
+        autoTable(doc, {
+          startY: y + 10,
+          margin: { left: marginX, right: marginX },
+          head: [["Policy Number", "Company / Type", "Validity", "Premium"]],
+          body: reportDetails.items.map((p: any) => [
+            `#${p.policyNumber}`,
+            `${p.insuranceCompany}\n${p.policyType}`,
+            `${new Date(p.startDate).toLocaleDateString()} - ${new Date(p.expiryDate).toLocaleDateString()}`,
+            `Rs. ${p.premiumAmount?.toLocaleString("en-IN")}`,
+          ]),
+          styles: { font: "helvetica", fontSize: 9, cellPadding: 6, textColor: INK, lineColor: BORDER },
+          headStyles: { fillColor: INK, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8 },
+          columnStyles: { 3: { halign: "right" } },
+          theme: "grid",
+        });
+      }
+    }
+
+    // --- Footer + page numbers on every page ---
+    const pageCount = doc.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const footerY = pageHeight - 56;
+
+      doc.setDrawColor(...BORDER);
+      doc.setLineDashPattern([2, 2], 0);
+      doc.line(marginX, footerY, pageWidth - marginX, footerY);
+      doc.setLineDashPattern([], 0);
+
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...MUTED);
+      doc.text("Security Signature Verification", marginX, footerY + 16);
+      doc.setFont("helvetica", "normal");
+      doc.text("PolicyFlow Database Verification Active", marginX, footerY + 28);
+
+      doc.setDrawColor(...BORDER);
+      doc.roundedRect(pageWidth - marginX - 140, footerY + 6, 140, 28, 4, 4);
+      doc.setFontSize(7.5);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...INK);
+      doc.text("POLICYFLOW SEAL", pageWidth - marginX - 70, footerY + 17, { align: "center" });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...MUTED);
+      doc.text("Verified digitally (100% Secure)", pageWidth - marginX - 70, footerY + 27, { align: "center" });
+
+      doc.setFontSize(7);
+      doc.setTextColor(...MUTED);
+      doc.text(`Page ${i} of ${pageCount}`, pageWidth / 2, pageHeight - 20, { align: "center" });
+    }
+
+    const safeName = String(reportDetails.subjectName || "Statement").replace(/[^a-z0-9]+/gi, "_");
+    doc.save(`PolicyFlow_${safeName}_${now.toISOString().split("T")[0]}.pdf`);
   };
 
   return (
@@ -594,7 +822,7 @@ export default function ReportsPage() {
                   {reportDetails ? (
                     <>
                       {/* Statement controls */}
-                      <div className="flex items-center justify-between border-b border-neutral-100 pb-4 no-print">
+                      <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 border border-emerald-100">
                           <CheckCircle2 className="h-3.5 w-3.5" /> Compiled Successfully
                         </span>
@@ -606,10 +834,10 @@ export default function ReportsPage() {
                             Close
                           </button>
                           <button
-                            onClick={triggerPrint}
+                            onClick={downloadPdfReport}
                             className="rounded-xl bg-blue-600 text-white px-3.5 py-1.5 text-xs font-bold hover:bg-blue-700 transition-all cursor-pointer flex items-center gap-1"
                           >
-                            <Printer className="h-3.5 w-3.5" /> Print / Save PDF
+                            <Download className="h-3.5 w-3.5" /> Download PDF
                           </button>
                         </div>
                       </div>

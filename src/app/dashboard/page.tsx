@@ -366,7 +366,7 @@ export default function DashboardPage() {
               ) : (
                 <div className="h-72 w-full text-xs font-medium">
                   <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={monthlyChart} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <AreaChart data={monthlyChart} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                       <defs>
                         <linearGradient id="colorPolicies" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
@@ -425,8 +425,9 @@ export default function DashboardPage() {
                       </PieChart>
                     </ResponsiveContainer>
                   </div>
-                  {/* Legend distribution mapping */}
-                  <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                  {/* Legend distribution mapping - fixed height with its own scroll, since
+                      up to 50 providers can be returned and the card shouldn't grow unbounded */}
+                  <div className="space-y-1.5 h-40 overflow-y-auto pr-1">
                     {companyChart.map((item, idx) => (
                       <div key={item.name} className="flex items-center justify-between text-[11px] font-semibold">
                         <div className="flex items-center gap-1.5 text-neutral-600">
