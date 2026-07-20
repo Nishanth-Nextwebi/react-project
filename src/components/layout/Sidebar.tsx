@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   LayoutDashboard,
   Users,
@@ -14,13 +14,16 @@ import {
   UserCheck,
   Settings,
   ShieldCheck,
+  LogOut,
+  X,
 } from "lucide-react";
 
 interface SidebarProps {
-  className?: string;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
-export default function Sidebar({ className = "" }: SidebarProps) {
+export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession();
   const user = session?.user;
@@ -71,26 +74,48 @@ export default function Sidebar({ className = "" }: SidebarProps) {
   };
 
   return (
-    <aside
-      id="app_sidebar"
-      className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col border-r border-neutral-100 bg-white ${className}`}
-    >
-      {/* Sidebar Branding Header */}
-      <div id="sidebar_branding" className="flex h-16 items-center gap-2 px-6 border-b border-neutral-100">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
-          <ShieldCheck className="h-5 w-5" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-bold tracking-tight text-neutral-800 leading-none">
-            PolicyFlow
-          </span>
-          <span className="mt-1 text-[10px] text-neutral-400 font-medium tracking-wider uppercase">
-            Insurance Hub
-          </span>
-        </div>
-      </div>
+    <>
+      {/* Backdrop - mobile only, shown while the drawer is open */}
+      {mobileOpen && (
+        <div
+          id="sidebar_mobile_backdrop"
+          onClick={onMobileClose}
+          className="fixed inset-0 z-40 bg-black/40 md:hidden"
+        />
+      )}
 
-      {/* Navigational Links List */}
+      <aside
+        id="app_sidebar"
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 max-w-[80vw] flex-col border-r border-neutral-100 bg-white transform transition-transform duration-200 ease-in-out md:translate-x-0 ${
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Sidebar Branding Header */}
+        <div id="sidebar_branding" className="flex h-16 items-center justify-between gap-2 px-6 border-b border-neutral-100">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-white">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-sm font-bold tracking-tight text-neutral-800 leading-none">
+                PolicyFlow
+              </span>
+              <span className="mt-1 text-[10px] text-neutral-400 font-medium tracking-wider uppercase">
+                Insurance Hub
+              </span>
+            </div>
+          </div>
+          {/* Close drawer - mobile only */}
+          <button
+            id="sidebar_mobile_close_btn"
+            onClick={onMobileClose}
+            className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800 md:hidden cursor-pointer"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        {/* Navigational Links List */}
       <nav id="sidebar_nav" className="flex-1 space-y-6 px-4 py-6 overflow-y-auto">
         <div className="space-y-1">
           <p className="px-3 text-[11px] font-semibold text-neutral-400 uppercase tracking-wider">
@@ -105,6 +130,7 @@ export default function Sidebar({ className = "" }: SidebarProps) {
                   <Link
                     href={item.href}
                     id={`nav_link_${item.name.toLowerCase().replace(/\s+/g, "_")}`}
+                    onClick={onMobileClose}
                     className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                       active
                         ? "bg-blue-50 text-blue-700 font-semibold"
@@ -135,6 +161,7 @@ export default function Sidebar({ className = "" }: SidebarProps) {
                     <Link
                       href={item.href}
                       id={`nav_link_${item.name.toLowerCase().replace(/\s+/g, "_")}`}
+                      onClick={onMobileClose}
                       className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all ${
                         active
                           ? "bg-blue-50 text-blue-700 font-semibold"
@@ -152,8 +179,17 @@ export default function Sidebar({ className = "" }: SidebarProps) {
         )}
       </nav>
 
-      {/* Sidebar Footer Badge */}
-      <div id="sidebar_footer_status" className="p-4 border-t border-neutral-100 bg-neutral-50/50">
+      {/* Sidebar Footer - Sign Out (mobile only, desktop keeps it in the header) + status badge */}
+      <div id="sidebar_footer_status" className="p-4 border-t border-neutral-100 bg-neutral-50/50 space-y-3">
+        <button
+          id="sidebar_mobile_signout_btn"
+          onClick={() => signOut({ callbackUrl: "/login" })}
+          className="flex w-full items-center justify-center gap-2 rounded-xl border border-neutral-200 bg-white py-2.5 text-xs font-bold text-neutral-700 hover:bg-red-50 hover:text-red-600 hover:border-red-100 transition-all cursor-pointer md:hidden"
+        >
+          <LogOut className="h-4 w-4" />
+          Sign Out
+        </button>
+
         <div className="rounded-xl bg-white border border-neutral-100 p-3 flex items-center gap-3">
           <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse shrink-0"></div>
           <div className="flex flex-col">
@@ -162,6 +198,7 @@ export default function Sidebar({ className = "" }: SidebarProps) {
           </div>
         </div>
       </div>
-    </aside>
+      </aside>
+    </>
   );
 }

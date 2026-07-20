@@ -549,6 +549,7 @@ export default function PoliciesPage() {
           /* Form tab layout */
           <motion.form
             id="unified_insurance_form"
+            noValidate
             onSubmit={handleSaveInsurance}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -889,7 +890,7 @@ export default function PoliciesPage() {
                   <div className="pt-2 border-t border-neutral-50 space-y-3">
                     <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Custom Policy Attributes</p>
                     
-                    <div className="grid grid-cols-3 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <input
                         type="text"
                         placeholder="Agent Commission"

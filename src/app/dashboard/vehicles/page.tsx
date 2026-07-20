@@ -915,7 +915,7 @@ export default function VehicleListingPage() {
                 </div>
 
                 {/* Manufacturer & Model row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-700">Manufacturer *</label>
                     <input
@@ -950,7 +950,7 @@ export default function VehicleListingPage() {
                 </div>
 
                 {/* Year & Color */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-700">Mfg Year *</label>
                     <input
@@ -1076,7 +1076,7 @@ export default function VehicleListingPage() {
                 )}
 
                 {/* Manufacturer & Model row */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-700">Manufacturer *</label>
                     <input
@@ -1140,7 +1140,7 @@ export default function VehicleListingPage() {
                 </div>
 
                 {/* Year & Color */}
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold text-neutral-700">Mfg Year *</label>
                     <input
@@ -1305,7 +1305,7 @@ export default function VehicleListingPage() {
                   <div className="h-px bg-neutral-50"></div>
 
                   {/* Engine details grid */}
-                  <div className="grid grid-cols-2 gap-4 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
                     <div className="space-y-1">
                       <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Engine Number</p>
                       <p className="font-mono font-bold text-neutral-800">{viewingVehicle.engineNumber}</p>
