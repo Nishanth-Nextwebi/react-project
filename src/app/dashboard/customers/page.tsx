@@ -916,7 +916,7 @@ export default function CustomersPage() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 max-h-[350px] overflow-y-auto p-1">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[350px] overflow-y-auto p-1">
                 <div className="col-span-2 space-y-1">
                   <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Vehicle Plate Number *</label>
                   <input

@@ -649,7 +649,7 @@ export default function ReportsPage() {
                         {reportDetails.additional && (
                           <div className="space-y-4 border-t border-neutral-100 pt-4 text-xs">
                             <h4 className="font-bold text-neutral-900 uppercase text-[10px] tracking-wider">Asset Owner Linkages</h4>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <p className="text-[10px] text-neutral-400">Linked Customer</p>
                                 <p className="font-bold text-neutral-800 mt-0.5">{reportDetails.additional.customerName || "N/A"}</p>
