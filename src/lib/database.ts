@@ -23,5 +23,10 @@ export const db: Database = getDatabase();
  * transaction-client type, since the cast is contained here.
  */
 export function transaction<T>(fn: (tx: Database) => Promise<T>): Promise<T> {
-  return db.$transaction((tx) => fn(tx as Database));
+  // Prisma's default interactive-transaction timeout is 5000ms, which several
+  // sequential round trips (e.g. SmartSaveService's customer/vehicle/policy
+  // lookups + writes) can exceed over a remote Aiven connection, aborting the
+  // transaction mid-flight with "expired transaction" even though nothing was
+  // actually wrong with the data.
+  return db.$transaction((tx) => fn(tx as Database), { maxWait: 10000, timeout: 20000 });
 }

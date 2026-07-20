@@ -1,5 +1,5 @@
 "use client";
-// removed required
+
 import React, { useState, useEffect, useCallback } from "react";
 import {
   Search,
@@ -124,6 +124,42 @@ export default function PoliciesPage() {
   const [policyToDeactivate, setPolicyToDeactivate] = useState<Policy | null>(null);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
 
+  // Field-level validation/error state shown inline on the Add Insurance form.
+  // RequiredField are blocked client-side pre-submit; FormField additionally
+  // covers fields that can only fail server-side (e.g. duplicate engine/
+  // chassis number), so those responses can still highlight the right input.
+  type RequiredField =
+    | "phone"
+    | "custName"
+    | "vehicleNumber"
+    | "insuranceCompany"
+    | "policyNumber"
+    | "policyType"
+    | "premiumAmount"
+    | "startDate"
+    | "expiryDate";
+  type FormField = RequiredField | "engineNumber" | "chassisNumber";
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<FormField, string>>>({});
+
+  const clearFieldError = (field: FormField) => {
+    setFieldErrors((prev) => {
+      if (!prev[field]) return prev;
+      const next = { ...prev };
+      delete next[field];
+      return next;
+    });
+  };
+
+  const errorInputClass = (field: FormField) =>
+    fieldErrors[field]
+      ? "border-red-400 focus:ring-red-500 focus:border-red-500"
+      : "border-neutral-200 focus:ring-blue-500 focus:border-blue-500";
+
+  const FieldError = ({ field }: { field: FormField }) =>
+    fieldErrors[field] ? (
+      <p className="text-[10px] font-semibold text-red-600">{fieldErrors[field]}</p>
+    ) : null;
+
   // 1. Load policies list
   const fetchPolicies = useCallback(async () => {
     setLoadingPolicies(true);
@@ -195,6 +231,7 @@ export default function PoliciesPage() {
   const handlePhoneChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     setPhone(val);
+    clearFieldError("phone");
     if (val.trim().length >= 10) {
       // Defer slightly or let blur trigger
     } else {
@@ -256,18 +293,29 @@ export default function PoliciesPage() {
   const handleSaveInsurance = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!phone || !custName) {
-      toast.error("Phone Number and Full Name are required.");
+    const errors: Partial<Record<RequiredField, string>> = {};
+    if (!phone.trim()) errors.phone = "Phone number is required.";
+    if (!custName.trim()) errors.custName = "Full name is required.";
+    if (!vehicleNumber.trim()) errors.vehicleNumber = "Vehicle number is required.";
+    if (!insuranceCompany.trim()) errors.insuranceCompany = "Insurance company is required.";
+    if (!policyNumber.trim()) errors.policyNumber = "Policy number is required.";
+    if (!policyType.trim()) errors.policyType = "Policy type is required.";
+    if (!premiumAmount) errors.premiumAmount = "Premium amount is required.";
+    if (!startDate) errors.startDate = "Start date is required.";
+    if (!expiryDate) errors.expiryDate = "Expiry date is required.";
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      toast.error("Please fill in the highlighted required fields.");
+      const firstErrorField = (
+        ["phone", "custName", "vehicleNumber", "insuranceCompany", "policyNumber", "policyType", "premiumAmount", "startDate", "expiryDate"] as RequiredField[]
+      ).find((field) => errors[field]);
+      if (firstErrorField) {
+        document.getElementById(`field_${firstErrorField}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
       return;
     }
-    if (!vehicleNumber) {
-      toast.error("Vehicle Number is required.");
-      return;
-    }
-    if (!policyNumber || !insuranceCompany || !policyType || !premiumAmount || !startDate || !expiryDate) {
-      toast.error("Please complete all required Policy Details.");
-      return;
-    }
+    setFieldErrors({});
 
     setSaving(true);
     try {
@@ -316,7 +364,30 @@ export default function PoliciesPage() {
         // Redirect/switch tab to list
         setActiveTab("list");
       } else {
-        toast.error(result.message || "Failed to save insurance.");
+        const serverErrors: string[] = result.errors || [];
+        const combinedText = [result.message, ...serverErrors].filter(Boolean).join(" ").toLowerCase();
+
+        // Map known duplicate/lookup failures back onto the offending field
+        // so the user sees a highlighted input, not just a toast.
+        const fieldMatch: FormField | null = combinedText.includes("engine number")
+          ? "engineNumber"
+          : combinedText.includes("chassis number")
+          ? "chassisNumber"
+          : combinedText.includes("registration number")
+          ? "vehicleNumber"
+          : combinedText.includes("policy number")
+          ? "policyNumber"
+          : null;
+
+        if (fieldMatch) {
+          setFieldErrors((prev) => ({ ...prev, [fieldMatch]: serverErrors[0] || result.message }));
+          document.getElementById(`field_${fieldMatch}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+
+        toast.error(result.message || "Failed to save insurance.", {
+          description: serverErrors.length > 0 ? serverErrors.join(" ") : undefined,
+          duration: 8000,
+        });
       }
     } catch (error) {
       console.error("Smart Save error:", error);
@@ -353,6 +424,7 @@ export default function PoliciesPage() {
     setExtraField2("");
     setExtraField3("");
     setComments("");
+    setFieldErrors({});
   };
 
   // 6. Renewal copying
@@ -509,27 +581,34 @@ export default function PoliciesPage() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Phone Number *</label>
                     <input
+                      id="field_phone"
                       type="text"
                       required
                       placeholder="e.g. 9876543210"
                       value={phone}
                       onChange={handlePhoneChange}
                       onBlur={handlePhoneBlur}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 ${errorInputClass("phone")}`}
                     />
+                    <FieldError field="phone" />
                     <p className="text-[10px] text-neutral-400">lookup triggers instantly on blur or 10-digit enter</p>
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Full Name *</label>
                     <input
+                      id="field_custName"
                       type="text"
                       required
                       placeholder="e.g. Rahul Sharma"
                       value={custName}
-                      onChange={(e) => setCustName(e.target.value)}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={(e) => {
+                        setCustName(e.target.value);
+                        clearFieldError("custName");
+                      }}
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 ${errorInputClass("custName")}`}
                     />
+                    <FieldError field="custName" />
                   </div>
 
                   <div className="space-y-1.5 md:col-span-2">
@@ -579,37 +658,52 @@ export default function PoliciesPage() {
                   <div className="space-y-1.5 md:col-span-1">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Vehicle Number *</label>
                     <input
+                      id="field_vehicleNumber"
                       type="text"
                       required
                       placeholder="e.g. MH12AB1234"
                       value={vehicleNumber}
-                      onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setVehicleNumber(e.target.value.toUpperCase());
+                        clearFieldError("vehicleNumber");
+                      }}
                       onBlur={handleVehicleBlur}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 font-mono ${errorInputClass("vehicleNumber")}`}
                     />
+                    <FieldError field="vehicleNumber" />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Chassis Number (Optional)</label>
                     <input
+                      id="field_chassisNumber"
                       type="text"
                       placeholder="e.g. 17-digit frame number"
                       value={chassisNumber}
-                      onChange={(e) => setChassisNumber(e.target.value.toUpperCase())}
+                      onChange={(e) => {
+                        setChassisNumber(e.target.value.toUpperCase());
+                        clearFieldError("chassisNumber");
+                      }}
                       onBlur={handleChassisBlur}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 font-mono ${errorInputClass("chassisNumber")}`}
                     />
+                    <FieldError field="chassisNumber" />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Engine Number (Optional)</label>
                     <input
+                      id="field_engineNumber"
                       type="text"
                       placeholder="e.g. ENG99988877"
                       value={engineNumber}
-                      onChange={(e) => setEngineNumber(e.target.value.toUpperCase())}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                      onChange={(e) => {
+                        setEngineNumber(e.target.value.toUpperCase());
+                        clearFieldError("engineNumber");
+                      }}
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 font-mono ${errorInputClass("engineNumber")}`}
                     />
+                    <FieldError field="engineNumber" />
                   </div>
 
                   <div className="space-y-1.5">
@@ -687,38 +781,53 @@ export default function PoliciesPage() {
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Insurance Company *</label>
                     <input
+                      id="field_insuranceCompany"
                       type="text"
                       required
                       placeholder="e.g. Tata AIG, HDFC Ergo"
                       value={insuranceCompany}
-                      onChange={(e) => setInsuranceCompany(e.target.value)}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      onChange={(e) => {
+                        setInsuranceCompany(e.target.value);
+                        clearFieldError("insuranceCompany");
+                      }}
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 ${errorInputClass("insuranceCompany")}`}
                     />
+                    <FieldError field="insuranceCompany" />
                   </div>
 
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Policy Number *</label>
                     <input
+                      id="field_policyNumber"
                       type="text"
                       required
                       placeholder="e.g. POL-12345678"
                       value={policyNumber}
-                      onChange={(e) => setPolicyNumber(e.target.value.toUpperCase())}
-                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 font-mono"
+                      onChange={(e) => {
+                        setPolicyNumber(e.target.value.toUpperCase());
+                        clearFieldError("policyNumber");
+                      }}
+                      className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 font-mono ${errorInputClass("policyNumber")}`}
                     />
+                    <FieldError field="policyNumber" />
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Policy Type *</label>
                       <input
+                        id="field_policyType"
                         type="text"
                         required
                         placeholder="e.g. Comprehensive"
                         value={policyType}
-                        onChange={(e) => setPolicyType(e.target.value)}
-                        className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(e) => {
+                          setPolicyType(e.target.value);
+                          clearFieldError("policyType");
+                        }}
+                        className={`w-full rounded-xl border px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 ${errorInputClass("policyType")}`}
                       />
+                      <FieldError field="policyType" />
                     </div>
 
                     <div className="space-y-1.5">
@@ -726,14 +835,19 @@ export default function PoliciesPage() {
                       <div className="relative">
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 font-semibold text-xs">₹</span>
                         <input
+                          id="field_premiumAmount"
                           type="number"
                           required
                           placeholder="Amount"
                           value={premiumAmount}
-                          onChange={(e) => setPremiumAmount(e.target.value)}
-                          className="w-full rounded-xl border border-neutral-200 pl-7 pr-3.5 py-2 text-xs font-medium text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                          onChange={(e) => {
+                            setPremiumAmount(e.target.value);
+                            clearFieldError("premiumAmount");
+                          }}
+                          className={`w-full rounded-xl border pl-7 pr-3.5 py-2 text-xs font-medium text-neutral-700 bg-white focus:outline-none focus:ring-1 ${errorInputClass("premiumAmount")}`}
                         />
                       </div>
+                      <FieldError field="premiumAmount" />
                     </div>
                   </div>
 
@@ -741,23 +855,33 @@ export default function PoliciesPage() {
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Start Date *</label>
                       <input
+                        id="field_startDate"
                         type="date"
                         required
                         value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(e) => {
+                          setStartDate(e.target.value);
+                          clearFieldError("startDate");
+                        }}
+                        className={`w-full rounded-xl border px-3.5 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 ${errorInputClass("startDate")}`}
                       />
+                      <FieldError field="startDate" />
                     </div>
 
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Expiry Date *</label>
                       <input
+                        id="field_expiryDate"
                         type="date"
                         required
                         value={expiryDate}
-                        onChange={(e) => setExpiryDate(e.target.value)}
-                        className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                        onChange={(e) => {
+                          setExpiryDate(e.target.value);
+                          clearFieldError("expiryDate");
+                        }}
+                        className={`w-full rounded-xl border px-3.5 py-2 text-xs font-semibold text-neutral-700 bg-white focus:outline-none focus:ring-1 ${errorInputClass("expiryDate")}`}
                       />
+                      <FieldError field="expiryDate" />
                     </div>
                   </div>
 
