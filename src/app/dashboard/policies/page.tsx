@@ -549,6 +549,7 @@ export default function PoliciesPage() {
           /* Form tab layout */
           <motion.form
             id="unified_insurance_form"
+            noValidate
             onSubmit={handleSaveInsurance}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
