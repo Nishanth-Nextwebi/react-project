@@ -198,4 +198,16 @@ export class PolicyRepository {
     });
     return policies;
   }
+
+  /** Powers the Send Message page's expiry-window tabs - `filter` is built
+   * dynamically per window (exact day offsets or a recent-expiry range),
+   * never a fixed calendar date. */
+  async findActiveByExpiryFilter(filter: Prisma.DateTimeFilter) {
+    const policies = await this.db.policy.findMany({
+      where: { isActive: true, expiryDate: filter },
+      orderBy: { expiryDate: "asc" },
+      include: INCLUDE,
+    });
+    return policies.map(toWirePolicy);
+  }
 }
