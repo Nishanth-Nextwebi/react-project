@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
       customerName,
       policyNumber,
       phone,
+      city,
       vehicleNumber,
       insuranceCompany,
       expiryFrom,
