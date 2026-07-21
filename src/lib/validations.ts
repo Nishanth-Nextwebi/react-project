@@ -35,6 +35,12 @@ export const customerSchema = z.object({
     .trim()
     .optional()
     .or(z.literal("")),
+  city: z
+    .string()
+    .max(100, "City cannot exceed 100 characters")
+    .trim()
+    .optional()
+    .or(z.literal("")),
   isActive: z.boolean().default(true),
 });
 

@@ -10,6 +10,7 @@ export interface SmartSaveCustomerInput {
   phone: string;
   email?: string;
   address?: string;
+  city?: string;
 }
 
 export interface SmartSaveVehicleInput {
@@ -84,13 +85,14 @@ export class SmartSaveService {
         let customer = await customerRepository.findActiveByPhone(phoneClean);
 
         if (customer) {
-          // Reuse existing customer. name is always overwritten; email/address
+          // Reuse existing customer. name is always overwritten; email/address/city
           // only if the caller actually sent that key (matches the original
           // `if (custData.email !== undefined) ...` guard exactly).
           customer = await customerRepository.update(customer.id, {
             name: custData.name.trim(),
             email: custData.email !== undefined ? custData.email.trim() : undefined,
             address: custData.address !== undefined ? custData.address.trim() : undefined,
+            city: custData.city !== undefined ? custData.city.trim() : undefined,
             updatedById: userId,
           });
           activities.push({ action: "User Actions", details: `Updated details for customer "${customer.name}"` });
@@ -100,6 +102,7 @@ export class SmartSaveService {
             phone: phoneClean,
             email: custData.email ? custData.email.trim() : "",
             address: custData.address ? custData.address.trim() : "",
+            city: custData.city ? custData.city.trim() : "",
             isActive: true,
             createdById: userId,
             updatedById: userId,

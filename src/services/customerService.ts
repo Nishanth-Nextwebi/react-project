@@ -83,6 +83,7 @@ export class CustomerService {
       phone: data.phone,
       email: data.email,
       address: data.address,
+      city: data.city,
       isActive: data.isActive,
       createdById: userId,
       updatedById: userId,
@@ -108,6 +109,7 @@ export class CustomerService {
         phone: data.phone,
         email: data.email,
         address: data.address,
+        city: data.city,
         isActive: data.isActive,
         updatedById: userId,
       });

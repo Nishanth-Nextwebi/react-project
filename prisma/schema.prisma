@@ -72,6 +72,7 @@ model Customer {
   phone    String  @db.VarChar(15)
   email    String  @default("") @db.VarChar(255)
   address  String  @default("") @db.VarChar(300)
+  city     String  @default("") @db.VarChar(100)
   isActive Boolean @default(true)
 
   createdById String

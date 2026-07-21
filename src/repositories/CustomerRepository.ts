@@ -17,6 +17,7 @@ export interface CreateCustomerData {
   phone: string;
   email?: string;
   address?: string;
+  city?: string;
   isActive?: boolean;
   createdById: string;
   updatedById: string;
@@ -27,6 +28,7 @@ export interface UpdateCustomerData {
   phone?: string;
   email?: string;
   address?: string;
+  city?: string;
   isActive?: boolean;
   updatedById: string;
 }

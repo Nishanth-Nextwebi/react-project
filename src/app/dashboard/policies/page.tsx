@@ -37,6 +37,7 @@ interface Customer {
   phone: string;
   email?: string;
   address?: string;
+  city?: string;
   isActive: boolean;
 }
 
@@ -92,8 +93,10 @@ function PoliciesPageContent() {
   const [custName, setCustName] = useState("");
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
   const [isExistingCustomer, setIsExistingCustomer] = useState(false);
   const [searchingCustomer, setSearchingCustomer] = useState(false);
+  const [customerVehicleOptions, setCustomerVehicleOptions] = useState<Vehicle[]>([]);
 
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleType, setVehicleType] = useState<"Two-Wheeler" | "Four-Wheeler" | "Commercial" | "Other">("Four-Wheeler");
@@ -305,13 +308,17 @@ function PoliciesPageContent() {
           setCustName(exactMatch.name);
           setEmail(exactMatch.email || "");
           setAddress(exactMatch.address || "");
+          setCity(exactMatch.city || "");
           setIsExistingCustomer(true);
           toast.success(`Found active customer: ${exactMatch.name}`);
+          fetchCustomerVehicleOptions(exactMatch._id);
         } else {
           setIsExistingCustomer(false);
+          setCustomerVehicleOptions([]);
         }
       } else {
         setIsExistingCustomer(false);
+        setCustomerVehicleOptions([]);
       }
     } catch (error) {
       console.error("Customer phone lookup error:", error);
@@ -332,7 +339,35 @@ function PoliciesPageContent() {
       // Defer slightly or let blur trigger
     } else {
       setIsExistingCustomer(false);
+      setCustomerVehicleOptions([]);
     }
+  };
+
+  // Pulls the found customer's already-registered vehicles so the user can
+  // quick-fill Section 2 instead of retyping specs for a returning customer.
+  const fetchCustomerVehicleOptions = async (customerId: string) => {
+    try {
+      const res = await fetch(`/api/vehicles?customerId=${customerId}&includeInactive=false&limit=50`);
+      const result = await res.json();
+      setCustomerVehicleOptions(result.success ? result.data?.vehicles || [] : []);
+    } catch (error) {
+      console.error("Customer vehicle options lookup error:", error);
+      setCustomerVehicleOptions([]);
+    }
+  };
+
+  const applyCustomerVehicle = (v: Vehicle) => {
+    setVehicleNumber(v.vehicleNumber);
+    setVehicleType(v.vehicleType);
+    setManufacturer(v.manufacturer);
+    setModel(v.model);
+    setYear(v.year);
+    setEngineNumber(v.engineNumber);
+    setChassisNumber(v.chassisNumber);
+    setColor(v.color || "");
+    setIsExistingVehicle(true);
+    clearFieldError("vehicleNumber");
+    toast.success(`Loaded vehicle specs for ${v.vehicleNumber}`);
   };
 
   // 3. Real-time Vehicle Lookup (Vehicle Number OR Chassis Number)
@@ -421,6 +456,7 @@ function PoliciesPageContent() {
           phone,
           email,
           address,
+          city,
         },
         vehicle: {
           vehicleNumber,
@@ -498,7 +534,9 @@ function PoliciesPageContent() {
     setCustName("");
     setEmail("");
     setAddress("");
+    setCity("");
     setIsExistingCustomer(false);
+    setCustomerVehicleOptions([]);
 
     setVehicleNumber("");
     setVehicleType("Four-Wheeler");
@@ -530,6 +568,7 @@ function PoliciesPageContent() {
     setCustName(policy.customer.name);
     setEmail(policy.customer.email || "");
     setAddress(policy.customer.address || "");
+    setCity(policy.customer.city || "");
     setIsExistingCustomer(true);
 
     // Fill vehicle info
@@ -729,6 +768,17 @@ function PoliciesPageContent() {
                       className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 resize-none"
                     />
                   </div>
+
+                  <div className="space-y-1.5 md:col-span-2">
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">City</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Bengaluru"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -750,6 +800,31 @@ function PoliciesPageContent() {
                     </span>
                   )}
                 </div>
+
+                {/* Quick-fill from this customer's already-registered vehicles */}
+                {customerVehicleOptions.length > 0 && (
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3 space-y-2">
+                    <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider flex items-center gap-1">
+                      <Car className="h-3 w-3" /> Registered vehicles for this customer - click to fill
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {customerVehicleOptions.map((v) => (
+                        <button
+                          key={v._id}
+                          type="button"
+                          onClick={() => applyCustomerVehicle(v)}
+                          className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition-all cursor-pointer ${
+                            vehicleNumber === v.vehicleNumber
+                              ? "border-blue-500 bg-blue-600 text-white"
+                              : "border-blue-200 bg-white text-blue-700 hover:bg-blue-100"
+                          }`}
+                        >
+                          {v.vehicleNumber} · {v.manufacturer} {v.model}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1.5 md:col-span-1">
