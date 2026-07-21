@@ -33,6 +33,7 @@ interface Customer {
   phone: string;
   email?: string;
   address?: string;
+  city?: string;
   isActive: boolean;
   createdAt: string;
 }
@@ -107,6 +108,7 @@ export default function CustomersPage() {
   const [custPhone, setCustPhone] = useState("");
   const [custEmail, setCustEmail] = useState("");
   const [custAddress, setCustAddress] = useState("");
+  const [custCity, setCustCity] = useState("");
 
   // Form Fields - Vehicle
   const [vehPlate, setVehPlate] = useState("");
@@ -207,6 +209,7 @@ export default function CustomersPage() {
     setCustPhone("");
     setCustEmail("");
     setCustAddress("");
+    setCustCity("");
     setIsCustomerModalOpen(true);
   };
 
@@ -218,6 +221,7 @@ export default function CustomersPage() {
     setCustPhone(selectedCustomer.phone);
     setCustEmail(selectedCustomer.email || "");
     setCustAddress(selectedCustomer.address || "");
+    setCustCity(selectedCustomer.city || "");
     setIsCustomerModalOpen(true);
   };
 
@@ -236,6 +240,7 @@ export default function CustomersPage() {
         phone: custPhone.trim(),
         email: custEmail.trim() || undefined,
         address: custAddress.trim() || undefined,
+        city: custCity.trim() || undefined,
       };
 
       let endpoint = "/api/customers";
@@ -595,7 +600,7 @@ export default function CustomersPage() {
               </div>
 
               {/* Core contact spec grids */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-neutral-400 shrink-0" />
                   <div>
@@ -619,6 +624,13 @@ export default function CustomersPage() {
                   <div className="overflow-hidden">
                     <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">Postal Location</p>
                     <p className="font-semibold text-neutral-800 mt-0.5 truncate">{selectedCustomer.address || "None Specified"}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4 text-neutral-400 shrink-0" />
+                  <div className="overflow-hidden">
+                    <p className="text-[9px] text-neutral-400 font-bold uppercase tracking-wider">City</p>
+                    <p className="font-semibold text-neutral-800 mt-0.5 truncate">{selectedCustomer.city || "None Specified"}</p>
                   </div>
                 </div>
               </div>
@@ -895,6 +907,17 @@ export default function CustomersPage() {
                     value={custAddress}
                     onChange={(e) => setCustAddress(e.target.value)}
                     rows={2}
+                    className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">City</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Bengaluru"
+                    value={custCity}
+                    onChange={(e) => setCustCity(e.target.value)}
                     className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 bg-white"
                   />
                 </div>

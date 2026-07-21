@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   LogOut,
   X,
+  MessageCircle,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -49,6 +50,11 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
       name: "Reports",
       href: "/dashboard/reports",
       icon: BarChart3,
+    },
+    {
+      name: "Send Message",
+      href: "/dashboard/messages",
+      icon: MessageCircle,
     },
   ];
 

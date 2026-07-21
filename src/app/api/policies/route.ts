@@ -33,6 +33,7 @@ export async function GET(req: NextRequest) {
     const customerName = searchParams.get("customerName") || undefined;
     const policyNumber = searchParams.get("policyNumber") || undefined;
     const phone = searchParams.get("phone") || undefined;
+    const city = searchParams.get("city") || undefined;
     const vehicleNumber = searchParams.get("vehicleNumber") || undefined;
     const insuranceCompany = searchParams.get("insuranceCompany") || undefined;
     const expiryFrom = searchParams.get("expiryFrom") || undefined;
@@ -51,6 +52,7 @@ export async function GET(req: NextRequest) {
       customerName,
       policyNumber,
       phone,
+      city,
       vehicleNumber,
       insuranceCompany,
       expiryFrom,

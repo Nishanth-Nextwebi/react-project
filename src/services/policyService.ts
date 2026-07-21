@@ -20,6 +20,7 @@ export interface PolicyPaginationParams {
   customerName?: string;
   policyNumber?: string;
   phone?: string;
+  city?: string;
   vehicleNumber?: string;
   insuranceCompany?: string;
   expiryFrom?: string;
@@ -60,6 +61,7 @@ export class PolicyService {
       customerName,
       policyNumber,
       phone,
+      city,
       vehicleNumber,
       insuranceCompany,
       expiryFrom,
@@ -99,10 +101,11 @@ export class PolicyService {
       where.insuranceCompany = { contains: insuranceCompany };
     }
 
-    if (customerName || phone) {
+    if (customerName || phone || city) {
       where.customer = {
         ...(customerName ? { name: { contains: customerName } } : {}),
         ...(phone ? { phone: { contains: phone } } : {}),
+        ...(city ? { city: { contains: city } } : {}),
       };
     }
 
