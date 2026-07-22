@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE `Policy` ADD COLUMN `loanProvider` VARCHAR(100) NOT NULL DEFAULT '';
+ALTER TABLE `Policy` ADD COLUMN `lastFollowUpAt` VARCHAR(50) NULL;

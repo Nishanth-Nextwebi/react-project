@@ -52,8 +52,8 @@ export default function Sidebar({ mobileOpen = false, onMobileClose }: SidebarPr
       icon: BarChart3,
     },
     {
-      name: "Send Message",
-      href: "/dashboard/messages",
+      name: "Track FollowUp",
+      href: "/dashboard/follow-up",
       icon: MessageCircle,
     },
   ];

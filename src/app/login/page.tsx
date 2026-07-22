@@ -184,17 +184,17 @@ function LoginFormContent() {
       </form>
 
       {/* Separator */}
-      <div id="login_separator" className="relative flex items-center justify-center">
+      {/* <div id="login_separator" className="relative flex items-center justify-center">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-neutral-100"></div>
         </div>
         <span className="relative bg-white px-4 text-xs font-medium uppercase tracking-wider text-neutral-400">
           Or continue with
         </span>
-      </div>
+      </div> */}
 
       {/* Google OAuth Button */}
-      <button
+      {/* <button
         type="button"
         id="google_oauth_btn"
         onClick={handleGoogleLogin}
@@ -207,17 +207,17 @@ function LoginFormContent() {
           <Chrome className="mr-2 h-4 w-4 text-red-500" />
         )}
         Sign in with Google
-      </button>
+      </button> */}
 
       {/* Quick Credentials Info Box */}
-      <div id="demo_credentials_tip" className="rounded-xl bg-neutral-50 border border-neutral-100 p-4 text-xs text-neutral-500 space-y-1.5">
+      {/* <div id="demo_credentials_tip" className="rounded-xl bg-neutral-50 border border-neutral-100 p-4 text-xs text-neutral-500 space-y-1.5">
         <p className="font-semibold text-neutral-700">💡 System Seed (Run GET /api/setup first):</p>
         <div className="mt-1">
           <p className="font-medium text-neutral-600">Administrator Account</p>
           <p>Email: <span className="font-mono text-neutral-700 font-semibold select-all">admin@insurance.com</span></p>
           <p>Password: <span className="font-mono text-neutral-700 font-semibold select-all">Admin123!</span></p>
         </div>
-      </div>
+      </div> */}
 
     </div>
   );

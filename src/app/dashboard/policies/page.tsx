@@ -67,6 +67,7 @@ interface Policy {
   extraField1?: string;
   extraField2?: string;
   extraField3?: string;
+  loanProvider?: string;
   comments?: string;
   attachmentUrl?: string;
   isActive: boolean;
@@ -118,6 +119,7 @@ function PoliciesPageContent() {
   const [extraField1, setExtraField1] = useState("");
   const [extraField2, setExtraField2] = useState("");
   const [extraField3, setExtraField3] = useState("");
+  const [loanProvider, setLoanProvider] = useState("");
   const [comments, setComments] = useState("");
 
   // Form Submission/Processing
@@ -184,12 +186,8 @@ function PoliciesPageContent() {
     | "custName"
     | "vehicleNumber"
     | "insuranceCompany"
-    | "policyNumber"
-    | "policyType"
-    | "premiumAmount"
-    | "startDate"
     | "expiryDate";
-  type FormField = RequiredField | "engineNumber" | "chassisNumber";
+  type FormField = RequiredField | "engineNumber" | "chassisNumber" | "policyNumber" | "policyType" | "premiumAmount" | "startDate";
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<FormField, string>>>({});
 
   const clearFieldError = (field: FormField) => {
@@ -434,17 +432,13 @@ function PoliciesPageContent() {
     if (!custName.trim()) errors.custName = "Full name is required.";
     if (!vehicleNumber.trim()) errors.vehicleNumber = "Vehicle number is required.";
     if (!insuranceCompany.trim()) errors.insuranceCompany = "Insurance company is required.";
-    if (!policyNumber.trim()) errors.policyNumber = "Policy number is required.";
-    if (!policyType.trim()) errors.policyType = "Policy type is required.";
-    if (!premiumAmount) errors.premiumAmount = "Premium amount is required.";
-    if (!startDate) errors.startDate = "Start date is required.";
     if (!expiryDate) errors.expiryDate = "Expiry date is required.";
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       toast.error("Please fill in the highlighted required fields.");
       const firstErrorField = (
-        ["phone", "custName", "vehicleNumber", "insuranceCompany", "policyNumber", "policyType", "premiumAmount", "startDate", "expiryDate"] as RequiredField[]
+        ["phone", "custName", "vehicleNumber", "insuranceCompany", "expiryDate"] as RequiredField[]
       ).find((field) => errors[field]);
       if (firstErrorField) {
         document.getElementById(`field_${firstErrorField}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -483,6 +477,7 @@ function PoliciesPageContent() {
           extraField1,
           extraField2,
           extraField3,
+          loanProvider,
           comments,
         },
       };
@@ -562,6 +557,7 @@ function PoliciesPageContent() {
     setExtraField1("");
     setExtraField2("");
     setExtraField3("");
+    setLoanProvider("");
     setComments("");
     setFieldErrors({});
   };
@@ -600,6 +596,7 @@ function PoliciesPageContent() {
     setExtraField1(policy.extraField1 || "");
     setExtraField2(policy.extraField2 || "");
     setExtraField3(policy.extraField3 || "");
+    setLoanProvider(policy.loanProvider || "");
 
     // Set tab to form
     setActiveTab("form");
@@ -973,12 +970,11 @@ function PoliciesPageContent() {
                   </div>
 
                   <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Policy Number *</label>
+                    <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Policy Number (Optional)</label>
                     <input
                       id="field_policyNumber"
                       type="text"
-                      required
-                      placeholder="e.g. POL-12345678"
+                      placeholder="e.g. POL-12345678 (auto-generated if left blank)"
                       value={policyNumber}
                       onChange={(e) => {
                         setPolicyNumber(e.target.value.toUpperCase());
@@ -991,11 +987,10 @@ function PoliciesPageContent() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Policy Type *</label>
+                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Policy Type (Optional)</label>
                       <input
                         id="field_policyType"
                         type="text"
-                        required
                         placeholder="e.g. Comprehensive"
                         value={policyType}
                         onChange={(e) => {
@@ -1008,13 +1003,12 @@ function PoliciesPageContent() {
                     </div>
 
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Premium Amount *</label>
+                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Premium Amount (Optional)</label>
                       <div className="relative">
                         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 font-semibold text-xs">₹</span>
                         <input
                           id="field_premiumAmount"
                           type="number"
-                          required
                           placeholder="Amount"
                           value={premiumAmount}
                           onChange={(e) => {
@@ -1030,11 +1024,10 @@ function PoliciesPageContent() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <div className="space-y-1.5">
-                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Start Date *</label>
+                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Start Date (Optional)</label>
                       <input
                         id="field_startDate"
                         type="date"
-                        required
                         value={startDate}
                         onChange={(e) => {
                           setStartDate(e.target.value);
@@ -1087,6 +1080,17 @@ function PoliciesPageContent() {
                         value={extraField3}
                         onChange={(e) => setExtraField3(e.target.value)}
                         className="rounded-lg border border-neutral-200 px-2.5 py-1.5 text-[11px] font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-bold text-neutral-500 uppercase tracking-wider">Loan Provider (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. HDFC Bank, Bajaj Finserv"
+                        value={loanProvider}
+                        onChange={(e) => setLoanProvider(e.target.value)}
+                        className="w-full rounded-xl border border-neutral-200 px-3.5 py-2 text-xs font-medium text-neutral-700 bg-white placeholder-neutral-300 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                       />
                     </div>
 
@@ -1584,10 +1588,20 @@ function PoliciesPageContent() {
                 </div>
 
                 {/* 4. Extra Custom Fields */}
-                {(selectedPolicy.extraField1 || selectedPolicy.extraField2 || selectedPolicy.extraField3 || selectedPolicy.comments) && (
+                {(selectedPolicy.extraField1 ||
+                  selectedPolicy.extraField2 ||
+                  selectedPolicy.extraField3 ||
+                  selectedPolicy.loanProvider ||
+                  selectedPolicy.comments) && (
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Custom Fields & Notes</h4>
                     <div className="rounded-xl border border-neutral-100 bg-neutral-50/40 p-4 space-y-2.5 text-xs">
+                      {selectedPolicy.loanProvider && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-400">Loan Provider</span>
+                          <strong className="text-neutral-800">{selectedPolicy.loanProvider}</strong>
+                        </div>
+                      )}
                       {selectedPolicy.extraField1 && (
                         <div className="flex justify-between">
                           <span className="text-neutral-400">Commission Rate</span>

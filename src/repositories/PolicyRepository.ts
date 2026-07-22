@@ -51,6 +51,7 @@ export interface CreatePolicyData {
   extraField1?: string;
   extraField2?: string;
   extraField3?: string;
+  loanProvider?: string;
   comments?: string;
   attachmentUrl?: string;
   isActive?: boolean;
@@ -70,9 +71,11 @@ export interface UpdatePolicyData {
   extraField1?: string;
   extraField2?: string;
   extraField3?: string;
+  loanProvider?: string;
   comments?: string;
   attachmentUrl?: string;
   isActive?: boolean;
+  lastFollowUpAt?: string | null;
   updatedById: string;
 }
 

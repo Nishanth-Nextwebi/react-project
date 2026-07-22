@@ -15,8 +15,8 @@ export interface SmartSaveCustomerInput {
 
 export interface SmartSaveVehicleInput {
   vehicleNumber: string;
-  chassisNumber: string;
-  engineNumber: string;
+  chassisNumber?: string;
+  engineNumber?: string;
   vehicleType?: WireVehicleType;
   manufacturer?: string;
   model?: string;
@@ -25,15 +25,16 @@ export interface SmartSaveVehicleInput {
 }
 
 export interface SmartSavePolicyInput {
-  policyNumber: string;
+  policyNumber?: string;
   insuranceCompany: string;
-  policyType: string;
-  premiumAmount: number | string;
-  startDate: string;
+  policyType?: string;
+  premiumAmount?: number | string;
+  startDate?: string;
   expiryDate: string;
   extraField1?: string;
   extraField2?: string;
   extraField3?: string;
+  loanProvider?: string;
   comments?: string;
   attachmentUrl?: string;
 }
@@ -54,6 +55,15 @@ class SmartSaveError extends Error {
     super(message);
     this.name = "SmartSaveError";
   }
+}
+
+/** Only Phone/Name/Insurance Company/Expiry Date/Vehicle Number are required
+ * on the Add Insurance form - everything else the DB still needs (policy
+ * number, engine/chassis number) but has no sensible default for gets a
+ * placeholder value here rather than blocking the save. Staff can fill in
+ * the real value later via Edit. */
+function generatePlaceholderCode(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
 export class SmartSaveService {
@@ -112,45 +122,55 @@ export class SmartSaveService {
 
         // --- STEP 2: Process Vehicle ---
         const vehicleNumClean = vehData.vehicleNumber.trim().toUpperCase();
-        const chassisNumClean = vehData.chassisNumber.trim().toUpperCase();
-        const engineNumClean = vehData.engineNumber.trim().toUpperCase();
+        const chassisNumInput = (vehData.chassisNumber || "").trim().toUpperCase();
+        const engineNumInput = (vehData.engineNumber || "").trim().toUpperCase();
 
-        let vehicle = await vehicleRepository.findActiveByVehicleNumberOrChassisNumber(vehicleNumClean, chassisNumClean);
+        // Only match on chassis number when one was actually provided - matching
+        // on a blank chassis number could false-positive against another
+        // vehicle that also had its chassis number auto-placeholder-filled.
+        let vehicle = chassisNumInput
+          ? await vehicleRepository.findActiveByVehicleNumberOrChassisNumber(vehicleNumClean, chassisNumInput)
+          : await vehicleRepository.findActiveByField("vehicleNumber", vehicleNumClean);
 
         if (vehicle) {
-          // Reuse existing vehicle: re-associate to the resolved customer,
-          // engine/chassis numbers always overwritten with the cleaned
-          // input, other fields fall back to their existing value when the
-          // caller didn't send one (matches the original's `x || existing`).
+          // Reuse existing vehicle: re-associate to the resolved customer.
+          // Engine/chassis numbers (and every other spec) only overwritten if
+          // the caller actually sent a value - leaving them blank keeps the
+          // vehicle's already-registered numbers instead of blanking them out.
           vehicle = await vehicleRepository.update(vehicle.id, {
             customerId: customer.id,
             vehicleType: vehData.vehicleType || undefined,
             manufacturer: vehData.manufacturer || undefined,
             model: vehData.model || undefined,
             year: vehData.year ? parseInt(String(vehData.year), 10) : undefined,
-            engineNumber: engineNumClean,
-            chassisNumber: chassisNumClean,
+            engineNumber: engineNumInput || undefined,
+            chassisNumber: chassisNumInput || undefined,
             color: vehData.color || undefined,
             updatedById: userId,
           });
           activities.push({ action: "User Actions", details: `Updated vehicle details for ${vehicle.vehicleNumber}` });
         } else {
-          // Check engine number uniqueness separately to prevent duplicate active engine number crash
-          if (await vehicleRepository.findActiveByField("engineNumber", engineNumClean)) {
+          // Brand-new vehicle: engine/chassis numbers are DB-required and
+          // globally unique, so a blank one (now optional in the UI) gets a
+          // placeholder rather than blocking the save.
+          const engineNumClean = engineNumInput || generatePlaceholderCode("AUTO-ENG");
+          const chassisNumClean = chassisNumInput || generatePlaceholderCode("AUTO-CHS");
+
+          // Only worth checking uniqueness for values the user actually typed -
+          // generated placeholders are unique by construction.
+          if (engineNumInput && (await vehicleRepository.findActiveByField("engineNumber", engineNumClean))) {
             throw new SmartSaveError(400, "Engine number already exists.", [
               "An active vehicle with this engine number is already registered.",
             ]);
           }
 
-          // Check registration plate uniqueness separately
           if (await vehicleRepository.findActiveByField("vehicleNumber", vehicleNumClean)) {
             throw new SmartSaveError(400, "Vehicle registration number already exists.", [
               "An active vehicle with this registration number is already registered.",
             ]);
           }
 
-          // Check chassis uniqueness separately
-          if (await vehicleRepository.findActiveByField("chassisNumber", chassisNumClean)) {
+          if (chassisNumInput && (await vehicleRepository.findActiveByField("chassisNumber", chassisNumClean))) {
             throw new SmartSaveError(400, "Chassis number already exists.", [
               "An active vehicle with this chassis number is already registered.",
             ]);
@@ -159,10 +179,10 @@ export class SmartSaveService {
           vehicle = await vehicleRepository.create({
             customerId: customer.id,
             vehicleNumber: vehicleNumClean,
-            vehicleType: vehData.vehicleType as WireVehicleType,
+            vehicleType: (vehData.vehicleType as WireVehicleType) || "Four-Wheeler",
             manufacturer: (vehData.manufacturer || "").trim(),
             model: (vehData.model || "").trim(),
-            year: parseInt(String(vehData.year), 10),
+            year: vehData.year ? parseInt(String(vehData.year), 10) : new Date().getFullYear(),
             engineNumber: engineNumClean,
             chassisNumber: chassisNumClean,
             color: vehData.color ? vehData.color.trim() : "",
@@ -177,7 +197,8 @@ export class SmartSaveService {
         }
 
         // --- STEP 3: Always Create a NEW Policy ---
-        const polNumClean = polData.policyNumber.trim().toUpperCase();
+        const polNumInput = (polData.policyNumber || "").trim().toUpperCase();
+        const polNumClean = polNumInput || generatePlaceholderCode("AUTO-POL");
 
         if (await policyRepository.findByPolicyNumber(polNumClean)) {
           throw new SmartSaveError(400, "Policy number already exists.", [
@@ -190,13 +211,14 @@ export class SmartSaveService {
           vehicleId: vehicle.id,
           policyNumber: polNumClean,
           insuranceCompany: polData.insuranceCompany.trim(),
-          policyType: polData.policyType.trim(),
-          premiumAmount: parseFloat(String(polData.premiumAmount)),
-          startDate: new Date(polData.startDate),
+          policyType: polData.policyType ? polData.policyType.trim() : "",
+          premiumAmount: polData.premiumAmount ? parseFloat(String(polData.premiumAmount)) : 0,
+          startDate: polData.startDate ? new Date(polData.startDate) : new Date(),
           expiryDate: new Date(polData.expiryDate),
           extraField1: polData.extraField1 ? polData.extraField1.trim() : "",
           extraField2: polData.extraField2 ? polData.extraField2.trim() : "",
           extraField3: polData.extraField3 ? polData.extraField3.trim() : "",
+          loanProvider: polData.loanProvider ? polData.loanProvider.trim() : "",
           comments: polData.comments ? polData.comments.trim() : "",
           attachmentUrl: polData.attachmentUrl ? polData.attachmentUrl.trim() : "",
           isActive: true,
