@@ -135,6 +135,7 @@ export const policySchema = z.object({
   extraField1: z.string().max(100).trim().optional().or(z.literal("")),
   extraField2: z.string().max(100).trim().optional().or(z.literal("")),
   extraField3: z.string().max(100).trim().optional().or(z.literal("")),
+  loanProvider: z.string().max(100, "Loan provider name is too long").trim().optional().or(z.literal("")),
   comments: z.string().max(1000).trim().optional().or(z.literal("")),
   attachmentUrl: z.string().trim().optional().or(z.literal("")),
   isActive: z.boolean().default(true),

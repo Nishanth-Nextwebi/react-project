@@ -9,12 +9,15 @@ interface PhoneActionsProps {
   phone: string | undefined | null;
   className?: string;
   menuAlign?: "left" | "right";
+  /** Fired in addition to opening the tel:/wa.me link - e.g. the Track
+   * FollowUp page uses this to record a follow-up timestamp on click. */
+  onAction?: (type: "call" | "whatsapp") => void;
 }
 
 /** Clickable phone number that opens a small Call / WhatsApp menu. Used
  * anywhere a customer phone number is displayed (customer detail panel,
- * policy list table, policy detail drawer). */
-export default function PhoneActions({ phone, className = "", menuAlign = "left" }: PhoneActionsProps) {
+ * policy list table, policy detail drawer, Track FollowUp page). */
+export default function PhoneActions({ phone, className = "", menuAlign = "left", onAction }: PhoneActionsProps) {
   const [open, setOpen] = useState(false);
 
   if (!phone) return null;
@@ -56,6 +59,7 @@ export default function PhoneActions({ phone, className = "", menuAlign = "left"
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
+                  onAction?.("call");
                 }}
                 className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-blue-50 hover:text-blue-700 transition-colors"
               >
@@ -68,6 +72,7 @@ export default function PhoneActions({ phone, className = "", menuAlign = "left"
                 onClick={(e) => {
                   e.stopPropagation();
                   setOpen(false);
+                  onAction?.("whatsapp");
                 }}
                 className="flex items-center gap-2 px-3 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors border-t border-neutral-50"
               >

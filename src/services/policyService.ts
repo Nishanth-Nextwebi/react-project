@@ -200,6 +200,7 @@ export class PolicyService {
       extraField1: data.extraField1,
       extraField2: data.extraField2,
       extraField3: data.extraField3,
+      loanProvider: data.loanProvider,
       comments: data.comments,
       attachmentUrl: data.attachmentUrl,
       isActive: data.isActive,
@@ -234,6 +235,7 @@ export class PolicyService {
         extraField1: data.extraField1,
         extraField2: data.extraField2,
         extraField3: data.extraField3,
+        loanProvider: data.loanProvider,
         comments: data.comments,
         attachmentUrl: data.attachmentUrl,
         isActive: data.isActive,
@@ -242,6 +244,31 @@ export class PolicyService {
     } catch (error: any) {
       if (error?.code === "P2025") {
         return null;
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Records a follow-up contact (Call/WhatsApp click from the Track FollowUp
+   * page) as a formatted date-time string, computed server-side so it can't
+   * be spoofed by a stale client clock.
+   */
+  async recordFollowUp(id: string, userId: string) {
+    const timestamp = new Date().toLocaleString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    try {
+      const policy = await this.repository.update(id, { lastFollowUpAt: timestamp, updatedById: userId });
+      return { success: true as const, policy };
+    } catch (error: any) {
+      if (error?.code === "P2025") {
+        return { success: false as const, status: 404, message: "Policy not found." };
       }
       throw error;
     }

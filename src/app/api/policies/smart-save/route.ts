@@ -28,16 +28,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (!vehData || !vehData.vehicleNumber || !vehData.chassisNumber || !vehData.engineNumber) {
+    if (!vehData || !vehData.vehicleNumber) {
       return NextResponse.json(
-        { success: false, message: "Validation failed.", errors: ["Vehicle number, engine number, and chassis number are required."] },
+        { success: false, message: "Validation failed.", errors: ["Vehicle number is required."] },
         { status: 400 }
       );
     }
 
-    if (!polData || !polData.policyNumber || !polData.insuranceCompany || !polData.policyType) {
+    if (!polData || !polData.insuranceCompany || !polData.expiryDate) {
       return NextResponse.json(
-        { success: false, message: "Validation failed.", errors: ["Policy number, insurance company, and policy type are required."] },
+        { success: false, message: "Validation failed.", errors: ["Insurance company and expiry date are required."] },
         { status: 400 }
       );
     }

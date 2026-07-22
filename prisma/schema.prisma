@@ -158,9 +158,15 @@ model Policy {
   extraField1      String   @default("") @db.VarChar(100)
   extraField2      String   @default("") @db.VarChar(100)
   extraField3      String   @default("") @db.VarChar(100)
+  loanProvider     String   @default("") @db.VarChar(100)
   comments         String   @default("") @db.VarChar(1000)
   attachmentUrl    String   @default("") @db.VarChar(500)
   isActive         Boolean  @default(true)
+
+  /// Set by the Track FollowUp page when staff clicks Call/WhatsApp on a
+  /// customer - a formatted date-time string (not a DateTime column), and
+  /// null until the first follow-up is recorded.
+  lastFollowUpAt String? @db.VarChar(50)
 
   createdById String
   createdBy   User   @relation("PolicyCreatedBy", fields: [createdById], references: [id])
