@@ -1,5 +1,7 @@
 import { CustomerRepository } from "@/repositories/CustomerRepository";
+import { PolicyRepository } from "@/repositories/PolicyRepository";
 import { VehicleRepository } from "@/repositories/VehicleRepository";
+import { transaction } from "@/lib/database";
 import type { CustomerInput } from "@/lib/validations";
 import type { Prisma } from "@/generated/prisma/client";
 
@@ -12,16 +14,15 @@ export interface CustomerPaginationParams {
   includeInactive?: boolean;
 }
 
+/** Raised inside the deleteCustomer transaction to abort before anything is
+ * written - an active policy blocks the whole operation. */
+class CustomerDeletionBlockedError extends Error {}
+
 export class CustomerService {
   private readonly repository: CustomerRepository;
-  private readonly vehicleRepository: VehicleRepository;
 
-  constructor(
-    repository: CustomerRepository = new CustomerRepository(),
-    vehicleRepository: VehicleRepository = new VehicleRepository()
-  ) {
+  constructor(repository: CustomerRepository = new CustomerRepository()) {
     this.repository = repository;
-    this.vehicleRepository = vehicleRepository;
   }
 
   /**
@@ -122,24 +123,41 @@ export class CustomerService {
   }
 
   /**
-   * Soft delete (deactivate) a Customer
-   * Strictly enforces business logic: Cannot deactivate if they have active vehicles linked.
+   * Permanently deletes a Customer (hard delete, not soft delete) together
+   * with every Policy and Vehicle that belongs to them - atomically.
+   *
+   * Blocked entirely, with nothing written, if the customer has an active
+   * Policy. Once that check passes, child records are deleted explicitly in
+   * dependency order (Policies, then Vehicles, then the Customer) inside a
+   * single transaction, so a foreign-key conflict can never occur here - do
+   * not reintroduce a P2003 catch for this flow, it would mean the explicit
+   * delete order above was broken.
    */
-  async softDeleteCustomer(id: string, userId: string) {
-    const activeVehiclesCount = await this.vehicleRepository.countActiveByCustomer(id);
-
-    if (activeVehiclesCount > 0) {
-      return {
-        success: false as const,
-        status: 400,
-        message: `Cannot deactivate customer. There are ${activeVehiclesCount} active vehicle(s) linked to this account.`,
-      };
-    }
-
+  async deleteCustomer(id: string) {
     try {
-      const updatedCustomer = await this.repository.update(id, { isActive: false, updatedById: userId });
-      return { success: true as const, customer: updatedCustomer };
+      const customer = await transaction(async (tx) => {
+        const customerRepository = new CustomerRepository(tx);
+        const policyRepository = new PolicyRepository(tx);
+        const vehicleRepository = new VehicleRepository(tx);
+
+        const activePoliciesCount = await policyRepository.countActiveByCustomer(id);
+        if (activePoliciesCount > 0) {
+          throw new CustomerDeletionBlockedError(
+            "This customer has an active policy. Please cancel or complete the policy before deleting the customer."
+          );
+        }
+
+        // Only inactive/expired/cancelled policies can remain at this point.
+        await policyRepository.deleteManyByCustomer(id);
+        await vehicleRepository.deleteManyByCustomer(id);
+        return customerRepository.delete(id);
+      });
+
+      return { success: true as const, customer };
     } catch (error: any) {
+      if (error instanceof CustomerDeletionBlockedError) {
+        return { success: false as const, status: 400, message: error.message };
+      }
       if (error?.code === "P2025") {
         return { success: false as const, status: 404, message: "Customer not found." };
       }

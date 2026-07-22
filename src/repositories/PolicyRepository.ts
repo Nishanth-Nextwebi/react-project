@@ -126,8 +126,21 @@ export class PolicyRepository {
     return toWirePolicy(policy);
   }
 
+  async delete(id: string) {
+    const policy = await this.db.policy.delete({ where: { id }, include: INCLUDE });
+    return toWirePolicy(policy);
+  }
+
   countActiveByVehicle(vehicleId: string) {
     return this.db.policy.count({ where: { vehicleId, isActive: true } });
+  }
+
+  countActiveByCustomer(customerId: string) {
+    return this.db.policy.count({ where: { customerId, isActive: true } });
+  }
+
+  deleteManyByCustomer(customerId: string) {
+    return this.db.policy.deleteMany({ where: { customerId } });
   }
 
   countActive() {

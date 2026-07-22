@@ -283,10 +283,15 @@ export class PolicyService {
   /**
    * Delete or deactivate a Policy (Soft delete by default)
    */
-  async softDeletePolicy(id: string, userId: string) {
+  /**
+   * Permanently deletes a Policy row (not a soft delete) - Policies have no
+   * child records referencing them, so there's no foreign-key concern here
+   * unlike Customer/Vehicle deletion.
+   */
+  async deletePolicy(id: string) {
     try {
-      const updatedPolicy = await this.repository.update(id, { isActive: false, updatedById: userId });
-      return { success: true as const, policy: updatedPolicy };
+      const deletedPolicy = await this.repository.delete(id);
+      return { success: true as const, policy: deletedPolicy };
     } catch (error: any) {
       if (error?.code === "P2025") {
         return { success: false as const, status: 404, message: "Policy not found." };

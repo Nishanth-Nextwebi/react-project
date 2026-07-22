@@ -129,6 +129,10 @@ export class VehicleRepository {
     return this.db.vehicle.count({ where: { customerId, isActive: true } });
   }
 
+  deleteManyByCustomer(customerId: string) {
+    return this.db.vehicle.deleteMany({ where: { customerId } });
+  }
+
   async create(data: CreateVehicleData) {
     const vehicle = await this.db.vehicle.create({
       data: {

@@ -110,7 +110,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 /**
  * DELETE /api/customers/[id]
- * Soft-deletes a customer by marking isActive = false
+ * Permanently deletes the customer - not reversible. Blocked if the
+ * customer has an active policy.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
@@ -123,7 +124,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const result = await customerService.softDeleteCustomer(id, session.user.id);
+    const result = await customerService.deleteCustomer(id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -134,7 +135,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       success: true,
-      message: "Customer deactivated successfully.",
+      message: "Customer permanently deleted.",
       data: serializeCustomer(result.customer),
     });
   } catch (error: any) {

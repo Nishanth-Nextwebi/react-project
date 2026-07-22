@@ -176,6 +176,7 @@ function PoliciesPageContent() {
   // Deactivate Policy modal
   const [policyToDeactivate, setPolicyToDeactivate] = useState<Policy | null>(null);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [deletingPolicy, setDeletingPolicy] = useState(false);
 
   // Field-level validation/error state shown inline on the Add Insurance form.
   // RequiredField are blocked client-side pre-submit; FormField additionally
@@ -605,25 +606,29 @@ function PoliciesPageContent() {
     toast.info("Transferred details to form! Please enter the New Policy Number & coverage dates.");
   };
 
-  // 7. Toggle Policy Activity (Soft Delete)
+  // 7. Permanently Delete Policy
   const confirmDeactivate = async () => {
     if (!policyToDeactivate) return;
 
+    setDeletingPolicy(true);
     try {
       const res = await fetch(`/api/policies/${policyToDeactivate._id}`, {
         method: "DELETE",
       });
       const result = await res.json();
       if (result.success) {
-        toast.success("Policy status updated successfully.");
+        toast.success("Policy permanently deleted.");
         fetchPolicies();
       } else {
-        toast.error(result.message || "Failed to update policy status.");
+        toast.error(result.message || "Failed to delete policy.", {
+          description: (result.errors || []).join(" ") || undefined,
+        });
       }
     } catch (error) {
-      console.error("Deactivate policy error:", error);
-      toast.error("Network error updating policy.");
+      console.error("Delete policy error:", error);
+      toast.error("Network error deleting policy.");
     } finally {
+      setDeletingPolicy(false);
       setIsDeactivateModalOpen(false);
       setPolicyToDeactivate(null);
     }
@@ -1410,7 +1415,7 @@ function PoliciesPageContent() {
                                       setPolicyToDeactivate(pol);
                                       setIsDeactivateModalOpen(true);
                                     }}
-                                    title="Toggle activity"
+                                    title="Delete permanently"
                                     className="rounded-lg p-1.5 text-neutral-400 hover:bg-rose-50 hover:text-rose-600 cursor-pointer"
                                   >
                                     <Trash2 className="h-4 w-4" />
@@ -1677,7 +1682,7 @@ function PoliciesPageContent() {
         )}
       </AnimatePresence>
 
-      {/* Confirmation Modal: Deactivate Policy */}
+      {/* Confirmation Modal: Permanently Delete Policy */}
       <AnimatePresence>
         {isDeactivateModalOpen && policyToDeactivate && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1702,25 +1707,27 @@ function PoliciesPageContent() {
               </div>
 
               <h3 className="mt-4 text-base font-bold text-neutral-800">
-                Toggle Policy Status
+                Delete Policy Permanently
               </h3>
               <p className="mt-2 text-xs text-neutral-500 leading-normal">
-                Are you sure you want to toggle the status of Policy <strong className="font-bold text-neutral-700">#{policyToDeactivate.policyNumber}</strong>? 
-                Suspended policies are excluded from live active tracking calculations, alerts and reports.
+                Are you sure you want to permanently delete Policy <strong className="font-bold text-neutral-700">#{policyToDeactivate.policyNumber}</strong>?{" "}
+                <strong className="text-rose-600">This action cannot be undone</strong> - the record will be removed entirely, not just suspended.
               </p>
 
               <div className="mt-6 flex items-center justify-end gap-3">
                 <button
                   onClick={() => setIsDeactivateModalOpen(false)}
-                  className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer"
+                  disabled={deletingPolicy}
+                  className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDeactivate}
-                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 transition-all cursor-pointer"
+                  disabled={deletingPolicy}
+                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Proceed Toggle
+                  {deletingPolicy ? "Deleting..." : "Delete Permanently"}
                 </button>
               </div>
             </motion.div>
