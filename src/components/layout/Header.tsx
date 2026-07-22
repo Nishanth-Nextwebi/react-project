@@ -60,7 +60,7 @@ export default function Header({ title = "Dashboard", onMenuClick }: HeaderProps
                 ) : (
                   <>
                     <Briefcase className="h-3 w-3 text-neutral-500" />
-                    Employee
+                    User
                   </>
                 )}
               </span>

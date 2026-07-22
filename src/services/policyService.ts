@@ -255,12 +255,18 @@ export class PolicyService {
    * be spoofed by a stale client clock.
    */
   async recordFollowUp(id: string, userId: string) {
+    // `en-IN` only controls date/number formatting style - without an explicit
+    // timeZone, this still renders in the server process's local timezone,
+    // which may not be IST. Pin it so the recorded time is always correct
+    // regardless of where the app is deployed.
     const timestamp = new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
       day: "2-digit",
       month: "short",
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      hour12: true,
     });
 
     try {

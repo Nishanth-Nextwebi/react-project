@@ -300,7 +300,7 @@ export default function UsersPage() {
           className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-blue-700 transition-all shadow-sm hover:shadow-md cursor-pointer self-start md:self-auto"
         >
           <Plus className="h-4 w-4" />
-          Onboard Employee
+          Onboard User
         </button>
       </div>
 
@@ -343,7 +343,7 @@ export default function UsersPage() {
           <div className="p-12 text-center text-neutral-400">
             <User className="h-10 w-10 text-neutral-200 mx-auto mb-2" />
             <p className="text-xs font-bold text-neutral-700">No users found</p>
-            <p className="text-[10px] text-neutral-400 mt-1">Try modifying your query or onboarding a new employee.</p>
+            <p className="text-[10px] text-neutral-400 mt-1">Try modifying your query or onboarding a new user.</p>
           </div>
         ) : (
           /* User Listings Grid */
@@ -368,7 +368,7 @@ export default function UsersPage() {
                       )}
                       {user.role === "employee" && (
                         <span className="inline-flex items-center gap-0.5 rounded-full bg-neutral-100 border border-neutral-200 text-neutral-700 px-2 py-0.5 text-[9px] font-bold">
-                          Staff
+                          User
                         </span>
                       )}
                     </h3>
@@ -418,7 +418,7 @@ export default function UsersPage() {
                       <button
                         onClick={() => openDeleteModal(user)}
                         className="p-1.5 hover:bg-rose-50 text-neutral-300 hover:text-rose-600 rounded-lg cursor-pointer transition-all"
-                        title="Delete employee profile"
+                        title="Delete user profile"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
@@ -497,7 +497,7 @@ export default function UsersPage() {
                     onChange={(e) => setFormRole(e.target.value as any)}
                     className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
                   >
-                    <option value="employee">Employee (Standard Access)</option>
+                    <option value="employee">User (Standard Access)</option>
                     <option value="admin">Admin (Full System Privileges)</option>
                   </select>
                 </div>
@@ -564,7 +564,7 @@ export default function UsersPage() {
                     onChange={(e) => setFormRole(e.target.value as any)}
                     className="w-full rounded-xl border border-neutral-200 px-3 py-2 text-xs font-semibold focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
                   >
-                    <option value="employee">Employee (Standard Access)</option>
+                    <option value="employee">User (Standard Access)</option>
                     <option value="admin">Admin (Full System Privileges)</option>
                   </select>
                 </div>
@@ -667,7 +667,7 @@ export default function UsersPage() {
               <div className="space-y-1">
                 <h3 className="text-sm font-black text-neutral-800">Confirm Account Deletion</h3>
                 <p className="text-neutral-400 text-xs leading-relaxed">
-                  Are you absolutely sure you want to delete the employee record for **{selectedUser.name}** ({selectedUser.email})? This action is permanent.
+                  Are you absolutely sure you want to delete the user record for **{selectedUser.name}** ({selectedUser.email})? This action is permanent.
                 </p>
               </div>
 
