@@ -176,6 +176,7 @@ function PoliciesPageContent() {
   // Deactivate Policy modal
   const [policyToDeactivate, setPolicyToDeactivate] = useState<Policy | null>(null);
   const [isDeactivateModalOpen, setIsDeactivateModalOpen] = useState(false);
+  const [deletingPolicy, setDeletingPolicy] = useState(false);
 
   // Field-level validation/error state shown inline on the Add Insurance form.
   // RequiredField are blocked client-side pre-submit; FormField additionally
@@ -609,6 +610,7 @@ function PoliciesPageContent() {
   const confirmDeactivate = async () => {
     if (!policyToDeactivate) return;
 
+    setDeletingPolicy(true);
     try {
       const res = await fetch(`/api/policies/${policyToDeactivate._id}`, {
         method: "DELETE",
@@ -626,6 +628,7 @@ function PoliciesPageContent() {
       console.error("Delete policy error:", error);
       toast.error("Network error deleting policy.");
     } finally {
+      setDeletingPolicy(false);
       setIsDeactivateModalOpen(false);
       setPolicyToDeactivate(null);
     }
@@ -1714,15 +1717,17 @@ function PoliciesPageContent() {
               <div className="mt-6 flex items-center justify-end gap-3">
                 <button
                   onClick={() => setIsDeactivateModalOpen(false)}
-                  className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer"
+                  disabled={deletingPolicy}
+                  className="rounded-xl border border-neutral-200 bg-white px-4 py-2.5 text-xs font-semibold text-neutral-700 hover:bg-neutral-50 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={confirmDeactivate}
-                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 transition-all cursor-pointer"
+                  disabled={deletingPolicy}
+                  className="rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-rose-700 transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  Delete Permanently
+                  {deletingPolicy ? "Deleting..." : "Delete Permanently"}
                 </button>
               </div>
             </motion.div>

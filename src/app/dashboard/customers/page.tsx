@@ -1089,11 +1089,11 @@ export default function CustomersPage() {
               </div>
 
               <div className="flex gap-2 pt-4 border-t border-neutral-50">
-                <button type="button" onClick={() => setIsConfirmDeleteCustomer(false)} className="flex-1 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-xs cursor-pointer">
+                <button type="button" onClick={() => setIsConfirmDeleteCustomer(false)} disabled={submitting} className="flex-1 py-2 bg-neutral-100 hover:bg-neutral-200 text-neutral-700 font-bold rounded-xl text-xs cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
                   Cancel
                 </button>
-                <button onClick={handleDeleteCustomer} disabled={submitting} className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs cursor-pointer">
-                  Delete Permanently
+                <button onClick={handleDeleteCustomer} disabled={submitting} className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed">
+                  {submitting ? "Deleting..." : "Delete Permanently"}
                 </button>
               </div>
             </motion.div>
