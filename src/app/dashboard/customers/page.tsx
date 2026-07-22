@@ -290,7 +290,7 @@ export default function CustomersPage() {
       });
       const result = await res.json();
       if (result.success) {
-        toast.success("Customer profile successfully soft-deleted (deactivated).");
+        toast.success("Customer permanently deleted.");
         setIsConfirmDeleteCustomer(false);
         setSelectedCustomerId(null);
         setSelectedCustomer(null);
@@ -591,7 +591,7 @@ export default function CustomersPage() {
                     <button
                       onClick={() => setIsConfirmDeleteCustomer(true)}
                       className="p-1.5 border border-rose-100 hover:bg-rose-50 rounded-xl text-neutral-300 hover:text-rose-600 transition-all cursor-pointer"
-                      title="Deactivate customer"
+                      title="Delete customer permanently"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -1079,12 +1079,12 @@ export default function CustomersPage() {
               </div>
 
               <div className="space-y-1">
-                <h3 className="text-xs font-black text-neutral-800">Confirm Deactivation</h3>
+                <h3 className="text-xs font-black text-neutral-800">Delete Customer Permanently</h3>
                 <p className="text-neutral-400 text-xs leading-relaxed">
-                  Are you sure you want to soft-delete (deactivate) **{selectedCustomer.name}**?
+                  Are you sure you want to permanently delete **{selectedCustomer.name}**? <span className="text-rose-600 font-bold">This action cannot be undone.</span>
                 </p>
                 <p className="text-rose-600 font-bold text-[10px] uppercase tracking-wider">
-                  Important: This fails if they have active vehicles linked in the ledger.
+                  Important: This fails if they have an active policy linked.
                 </p>
               </div>
 
@@ -1093,7 +1093,7 @@ export default function CustomersPage() {
                   Cancel
                 </button>
                 <button onClick={handleDeleteCustomer} disabled={submitting} className="flex-1 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl text-xs cursor-pointer">
-                  Confirm Deactivate
+                  Delete Permanently
                 </button>
               </div>
             </motion.div>

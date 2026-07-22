@@ -97,4 +97,14 @@ export class CustomerRepository {
       },
     });
   }
+
+  delete(id: string) {
+    return this.db.customer.delete({
+      where: { id },
+      include: {
+        createdBy: { select: AUDIT_SELECT },
+        updatedBy: { select: AUDIT_SELECT },
+      },
+    });
+  }
 }

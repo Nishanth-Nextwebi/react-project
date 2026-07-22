@@ -108,7 +108,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
 /**
  * DELETE /api/policies/[id]
- * Soft-deletes a policy by marking isActive = false
+ * Permanently deletes the policy - not reversible.
  */
 export async function DELETE(req: NextRequest, { params }: Params) {
   try {
@@ -121,7 +121,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     }
 
     const { id } = await params;
-    const result = await policyService.softDeletePolicy(id, session.user.id);
+    const result = await policyService.deletePolicy(id);
 
     if (!result.success) {
       return NextResponse.json(
@@ -132,7 +132,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
 
     return NextResponse.json({
       success: true,
-      message: "Policy deactivated successfully.",
+      message: "Policy permanently deleted.",
       data: serializePolicy(result.policy),
     });
   } catch (error: any) {
